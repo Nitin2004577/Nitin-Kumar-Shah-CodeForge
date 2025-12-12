@@ -1,9 +1,11 @@
 import React from 'react'
+import UserButton from '../../features/auth/components/user-button';
 
-const page = () => {
+export default function Home() {
   return (
-    <div>page</div>
-  )
+    <div>
+      <h1 className='text-4xl font-bold text-rose-500'> </h1>
+      <UserButton/>
+    </div>
+  );
 }
-
-export default page
