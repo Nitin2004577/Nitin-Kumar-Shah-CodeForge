@@ -29,11 +29,18 @@ const SignInFormClient = () => {
 
   const handleGithubSignIn = async () => {
     // client-side sign in
-    await signIn("github");
+   await signIn("github", {
+    callbackUrl: "/dashboard"
+   });
+   
+    
   };
 
   const handleGoogleSignIn = async () => {
-    await signIn("google");
+   await signIn("google", {
+    callbackUrl: "/dashboard"
+   });
+   
   };
 
   return (
