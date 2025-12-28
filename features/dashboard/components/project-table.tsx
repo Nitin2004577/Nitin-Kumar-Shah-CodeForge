@@ -217,7 +217,7 @@ export default function ProjectTable({
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <div className="w-8 h-8 rounded-full overflow-hidden">
-                      <Image
+                      <img
                         src={project.user.image || "/placeholder.svg"}
                         alt={project.user.name}
                         width={32}
