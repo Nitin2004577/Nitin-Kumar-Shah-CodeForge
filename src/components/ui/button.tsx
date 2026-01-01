@@ -9,6 +9,7 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
+        brand: "bg-rose-500 text-white hover:bg-rose-600",
         default: "bg-primary text-primary-foreground hover:bg-primary/90",
         destructive:
           "bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
@@ -39,19 +40,26 @@ const buttonVariants = cva(
 function Button({
   className,
   variant,
+  // `variants` alias kept for backwards-compatibility with incorrect usages
+  variants,
   size,
   asChild = false,
   ...props
 }: React.ComponentProps<"button"> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean
+    variants?: VariantProps<typeof buttonVariants>["variant"]
   }) {
   const Comp = asChild ? Slot : "button"
+
+  const resolvedVariant = (variants ?? variant) as
+    | VariantProps<typeof buttonVariants>["variant"]
+    | undefined
 
   return (
     <Comp
       data-slot="button"
-      className={cn(buttonVariants({ variant, size, className }))}
+      className={cn(buttonVariants({ variant: resolvedVariant, size, className }))}
       {...props}
     />
   )
