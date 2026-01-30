@@ -7,7 +7,7 @@ const LogoutButton = ({children}:LogoutButtonProps) => {
     const router = useRouter();
     const onLogout = async()=>{
         await signOut({
-          callbackUrl: "/auth/sign-in"
+          callbackUrl: "/"
         })
         router.refresh()
     }
