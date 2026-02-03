@@ -6,7 +6,7 @@ import type { TemplateFolder } from '@/../../features/playground/lib/path-to-jso
 
 interface PlaygroundData {
   id: string;
-  name?: string;
+  title?: string;
   [key: string]: any;
 }
 
