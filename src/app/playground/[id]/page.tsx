@@ -5,9 +5,13 @@ import { IdCard, Sidebar } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "../../../../src/components/ui/separator";
+import { usePlayground } from "../../../../features/playground/hooks/usePlayground";
 
 const Page = () => {
   const { id } = useParams<{ id: string }>();
+  const {playgroundData, templateData, isLoading, error, saveTemplateData} = usePlayground(id);
+
+  console.log("templateData");
   return (
     <TooltipProvider>
       <>
