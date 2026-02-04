@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "../../../../src/components/ui/separator";
 import { usePlayground } from "../../../../features/playground/hooks/usePlayground";
+import TemplateFileTree from "../../../../features/playground/components/template-file-tree";
 
 const Page = () => {
   const { id } = useParams<{ id: string }>();
@@ -15,6 +16,8 @@ const Page = () => {
   console.log(templateData);
   console.log("playgroundData", playgroundData);
   return (
+    <div>
+      <TemplateFileTree />
     <TooltipProvider>
       <>
         {/* TODO: TEMPLATEFILE TREE */}
@@ -32,6 +35,7 @@ const Page = () => {
         </SidebarInset>
       </>
     </TooltipProvider>
+    </div>
   );
 };
 export default Page;
