@@ -138,6 +138,46 @@ const TemplateFileTree = ({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          <SidebarGroupContent>
+            <Sidebar>
+              {
+                isRootFolder ? (
+                 ( data as  TemplateFolder).items.map((child, index) =>(
+                  <TemplateNode
+                  key={index}
+                  item={child}
+                  level= {0}
+                  path= ""
+                  onFileSelect={onFileSelect}
+                  selectedFile={selectedFile}
+                  onAddFile={onAddFile}
+                  onAddFolder={onAddFolder}
+                  onDeleteFile={onDeleteFile}
+                  onDeleteFolder={onDeleteFolder}
+                  onRenameFile={onRenameFile}
+                  onRenameFolder={onRenameFolder}
+                                  />
+                 ))
+                ) : (
+                <TemplateNode
+                  item={data}
+                  level= {0}
+                  path= ""
+                  onFileSelect={onFileSelect}
+                  selectedFile={selectedFile}
+                  onAddFile={onAddFile}
+                  onAddFolder={onAddFolder}
+                  onDeleteFile={onDeleteFile}
+                  onDeleteFolder={onDeleteFolder}
+                  onRenameFile={onRenameFile}
+                  onRenameFolder={onRenameFolder}
+                                  />)
+
+              }
+            </Sidebar>
+          </SidebarGroupContent>
+
         </SidebarGroup>
       </SidebarContent>
     </Sidebar>
