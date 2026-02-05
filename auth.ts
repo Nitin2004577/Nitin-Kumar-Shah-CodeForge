@@ -1,9 +1,9 @@
 // auth.ts
 import NextAuth from "next-auth"
 import { PrismaAdapter } from "@auth/prisma-adapter"
-import authConfig from "./auth.config"
 import { db } from "@/lib/db";
 import { getUserById } from "./features/auth/actions";
+import authConfig from "./auth.config"
 
 export const { auth, handlers, signIn, signOut } = NextAuth({
   pages: {
@@ -11,13 +11,6 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
     error: "/auth/error",
   },
   callbacks: {
-    async signIn({ user, account, profile }) {
-      // Allow sign in to proceed. 
-      // NextAuth + PrismaAdapter + allowDangerousEmailAccountLinking 
-      // will now handle the linking automatically in the background.
-      return true;
-    },
-
     async jwt({ token }) {
       if (!token.sub) return token;
 
@@ -40,7 +33,6 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
       return session;
     },
   },
-  secret: process.env.AUTH_SECRET,
   adapter: PrismaAdapter(db),
   session: { strategy: "jwt" },
   ...authConfig,
