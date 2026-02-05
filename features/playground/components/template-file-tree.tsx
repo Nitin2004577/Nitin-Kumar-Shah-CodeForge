@@ -62,6 +62,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { string } from "zod";
+import TemplateNode from "./template-node";
 
 // Using the provided interfaces
 interface TemplateFile {
@@ -75,6 +76,20 @@ interface TemplateFile {
 interface TemplateFolder {
   folderName: string;
   items: (TemplateFile | TemplateFolder)[];
+}
+
+interface TemplateNodeProps {
+  item: TemplateItem
+  onFileSelect?: (file: TemplateFile) => void
+  selectedFile?: TemplateFile
+  level: number
+  path?: string
+  onAddFile?: (file: TemplateFile, parentPath: string[]) => void
+  onAddFolder?: (folder: TemplateFolder, parentPath: string[]) => void
+  onDeleteFile?: (file: TemplateItem, parentPath: string[]) => void
+  onDeleteFolder?: (folder: TemplateFolder, parentPath: string[]) => void
+  onRenameFile?: (file: TemplateItem, newName: string, parentPath: string[]) => void
+  onRenameFolder?: (folder: TemplateFolder, newName: string, parentPath: string[]) => void
 }
 
 // Union type for items in the file system
