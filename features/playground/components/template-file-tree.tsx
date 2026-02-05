@@ -1,5 +1,4 @@
 "use client";
-import React from "react";
 import * as React from "react";
 import {
   ChevronRight,
@@ -71,7 +70,7 @@ interface TemplateFile {
   content: string;
 }
 /**
- * Represents a folder in the template structure which can caontain files and subfolders
+ * Represents a folder in the template structure which can contain files and subfolders
  */
 interface TemplateFolder {
   folderName: string;
@@ -88,9 +87,9 @@ interface TemplateFileTreeProps {
   title?: string;
   onAddFile?: (file: TemplateFile, parentPath: string[]) => void;
   onAddFolder?: (folder: TemplateFolder, parentPath: string[]) => void;
-  onDeleteItem?: (file: TemplateItem, parentPath: string[]) => void;
+  onDeleteFile?: (file: TemplateItem, parentPath: string[]) => void;
   onDeleteFolder?: (folder: TemplateFolder, parentPath: string[]) => void;
-  onRenameItem?: (
+  onRenameFile?: (
     file: TemplateItem,
     newName: string,
     parentPath: string[]
@@ -102,7 +101,18 @@ interface TemplateFileTreeProps {
   ) => void;
 }
 
-const TemplateFileTree = () => {
+const TemplateFileTree = ({
+  data,
+  onFileSelect,
+  selectedFile,
+  title = "Files Explorer",
+  onAddFile,
+  onAddFolder,
+  onDeleteFile,
+  onDeleteFolder,
+  onRenameFile,
+  onRenameFolder,
+}: TemplateFileTreeProps) => {
   return <div>TemplateFileTree</div>;
 };
 
