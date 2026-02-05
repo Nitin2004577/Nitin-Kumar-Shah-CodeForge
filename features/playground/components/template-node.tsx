@@ -1,4 +1,4 @@
-import React from 'react'
+import React from "react";
 // Using the provided interfaces
 interface TemplateFile {
   filename: string;
@@ -17,23 +17,41 @@ interface TemplateFolder {
 type TemplateItem = TemplateFile | TemplateFolder;
 
 interface TemplateNodeProps {
-  item: TemplateItem
-  onFileSelect?: (file: TemplateFile) => void
-  selectedFile?: TemplateFile
-  level: number
-  path?: string
-  onAddFile?: (file: TemplateFile, parentPath: string[]) => void
-  onAddFolder?: (folder: TemplateFolder, parentPath: string[]) => void
-  onDeleteFile?: (file: TemplateItem, parentPath: string[]) => void
-  onDeleteFolder?: (folder: TemplateFolder, parentPath: string[]) => void
-  onRenameFile?: (file: TemplateItem, newName: string, parentPath: string[]) => void
-  onRenameFolder?: (folder: TemplateFolder, newName: string, parentPath: string[]) => void
+  item: TemplateItem;
+  onFileSelect?: (file: TemplateFile) => void;
+  selectedFile?: TemplateFile;
+  level: number;
+  path?: string;
+  onAddFile?: (file: TemplateFile, parentPath: string[]) => void;
+  onAddFolder?: (folder: TemplateFolder, parentPath: string[]) => void;
+  onDeleteFile?: (file: TemplateItem, parentPath: string[]) => void;
+  onDeleteFolder?: (folder: TemplateFolder, parentPath: string[]) => void;
+  onRenameFile?: (
+    file: TemplateItem,
+    newName: string,
+    parentPath: string[]
+  ) => void;
+  onRenameFolder?: (
+    folder: TemplateFolder,
+    newName: string,
+    parentPath: string[]
+  ) => void;
 }
 
-const TemplateNode = () => {
-  return (
-    <div>TemplateNode</div>
-  )
-}
+const TemplateNode = ({
+  item,
+  onFileSelect,
+  selectedFile,
+  level,
+  path = "",
+  onAddFile,
+  onAddFolder,
+  onDeleteFile,
+  onDeleteFolder,
+  onRenameFile,
+  onRenameFolder,
+}: TemplateNodeProps) => {
+  return <div>TemplateNode</div>;
+};
 
-export default TemplateNode
+export default TemplateNode;
