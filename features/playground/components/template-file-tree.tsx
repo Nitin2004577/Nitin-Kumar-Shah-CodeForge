@@ -113,7 +113,35 @@ const TemplateFileTree = ({
   onRenameFile,
   onRenameFolder,
 }: TemplateFileTreeProps) => {
-  return <div>TemplateFileTree</div>;
+  const isRootFolder = data && typeof data === "object" && "folderName" in data;
+
+  return (
+    <Sidebar>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>{title}</SidebarGroupLabel>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger>
+              <SidebarGroupAction>
+                <Plus className="h-4 w-4" />
+              </SidebarGroupAction>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => {}}>
+                <FilePlus className="h-4 w-4 mr-2" />
+                New File
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => {}}>
+                <FolderPlus className="h-4 w-4 mr-2" />
+                New Folder
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </SidebarGroup>
+      </SidebarContent>
+    </Sidebar>
+  );
 };
 
 export default TemplateFileTree;

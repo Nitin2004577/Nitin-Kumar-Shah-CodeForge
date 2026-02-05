@@ -17,7 +17,9 @@ const Page = () => {
   console.log("playgroundData", playgroundData);
   return (
     <div>
-      <TemplateFileTree />
+      <TemplateFileTree 
+       data={templateData!}
+      />
     <TooltipProvider>
       <>
         {/* TODO: TEMPLATEFILE TREE */}
