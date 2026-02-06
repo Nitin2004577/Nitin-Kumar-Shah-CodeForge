@@ -1,4 +1,3 @@
-
 import React from "react";
 import { useState } from "react";
 import {
@@ -134,13 +133,36 @@ const TemplateNode = ({
             <File className="mr-2 h-4 w-4 shrink-0" />
             <span>{fileName}</span>
           </SidebarMenuButton>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant={"ghost"}
+                size={"icon"}
+                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <MoreHorizontal className="h-3 w-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => {}}>
+                <Edit3 className="h-4 w-4 mr-2" />
+                Rename
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => {}} className="text-destructive">
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </SidebarMenuItem>
     );
   }
-  return (
-    <h1>Folder</h1>
-  )
+  else{
+    
+  }
+  return <h1>Folder</h1>;
 };
 
 export default TemplateNode;
