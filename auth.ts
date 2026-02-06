@@ -10,8 +10,10 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
     signIn: "/auth/sign-in",
     error: "/auth/error",
   },
+  // Removed from here because TypeScript (v5) doesn't allow it as a top-level property
   callbacks: {
-    async jwt({ token }) {
+    async jwt({ token, user }) {
+      if (user) console.log("LOGIN DETECTED:", user.email);
       if (!token.sub) return token;
 
       const existingUser = await getUserById(token.sub);
@@ -23,13 +25,11 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
 
       return token;
     },
-
     async session({ session, token }) {
       if (token.sub && session.user) {
         session.user.id = token.sub;
         session.user.role = token.role as any;
       }
-
       return session;
     },
   },
