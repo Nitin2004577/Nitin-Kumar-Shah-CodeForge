@@ -61,7 +61,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { string } from "zod";
 import TemplateNode from "./template-node";
 
 // Using the provided interfaces
@@ -70,34 +69,34 @@ interface TemplateFile {
   fileExtension: string;
   content: string;
 }
-/**
- * Represents a folder in the template structure which can contain files and subfolders
- */
+
 interface TemplateFolder {
   folderName: string;
   items: (TemplateFile | TemplateFolder)[];
 }
 
-interface TemplateNodeProps {
-  item: TemplateItem
-  onFileSelect?: (file: TemplateFile) => void
-  selectedFile?: TemplateFile
-  level: number
-  path?: string
-  onAddFile?: (file: TemplateFile, parentPath: string[]) => void
-  onAddFolder?: (folder: TemplateFolder, parentPath: string[]) => void
-  onDeleteFile?: (file: TemplateItem, parentPath: string[]) => void
-  onDeleteFolder?: (folder: TemplateFolder, parentPath: string[]) => void
-  onRenameFile?: (file: TemplateItem, newName: string, parentPath: string[]) => void
-  onRenameFolder?: (folder: TemplateFolder, newName: string, parentPath: string[]) => void
-}
-
 // Union type for items in the file system
 type TemplateItem = TemplateFile | TemplateFolder;
 
+// Consistent interface for the individual Node
+interface TemplateNodeProps {
+  item: TemplateItem;
+  onFileSelect?: (file: TemplateFile) => void; // Function type
+  selectedFile?: TemplateFile;
+  level: number;
+  path?: string;
+  onAddFile?: (file: TemplateFile, parentPath: string[]) => void;
+  onAddFolder?: (folder: TemplateFolder, parentPath: string[]) => void;
+  onDeleteFile?: (file: TemplateItem, parentPath: string[]) => void;
+  onDeleteFolder?: (folder: TemplateFolder, parentPath: string[]) => void;
+  onRenameFile?: (file: TemplateItem, newName: string, parentPath: string[]) => void;
+  onRenameFolder?: (folder: TemplateFolder, newName: string, parentPath: string[]) => void;
+}
+
+// Consistent interface for the Main Tree
 interface TemplateFileTreeProps {
   data: TemplateItem;
-  onFileSelect?: TemplateFile;
+  onFileSelect?: (file: TemplateFile) => void; // Fixed: Function type matches TemplateNodeProps
   selectedFile?: TemplateFile;
   title?: string;
   onAddFile?: (file: TemplateFile, parentPath: string[]) => void;
@@ -137,7 +136,7 @@ const TemplateFileTree = ({
           <SidebarGroupLabel>{title}</SidebarGroupLabel>
 
           <DropdownMenu>
-            <DropdownMenuTrigger>
+            <DropdownMenuTrigger asChild>
               <SidebarGroupAction>
                 <Plus className="h-4 w-4" />
               </SidebarGroupAction>
@@ -155,30 +154,14 @@ const TemplateFileTree = ({
           </DropdownMenu>
 
           <SidebarGroupContent>
-            <Sidebar>
-              {
-                isRootFolder ? (
-                 ( data as  TemplateFolder).items.map((child, index) =>(
-                  <TemplateNode
-                  key={index}
-                  item={child}
-                  level= {0}
-                  path= ""
-                  onFileSelect={onFileSelect}
-                  selectedFile={selectedFile}
-                  onAddFile={onAddFile}
-                  onAddFolder={onAddFolder}
-                  onDeleteFile={onDeleteFile}
-                  onDeleteFolder={onDeleteFolder}
-                  onRenameFile={onRenameFile}
-                  onRenameFolder={onRenameFolder}
-                                  />
-                 ))
-                ) : (
+            {/* Removed nested Sidebar tag to fix layout issues */}
+            {isRootFolder ? (
+              (data as TemplateFolder).items.map((child, index) => (
                 <TemplateNode
-                  item={data}
-                  level= {0}
-                  path= ""
+                  key={`${index}-${"folderName" in child ? child.folderName : child.filename}`}
+                  item={child}
+                  level={0}
+                  path=""
                   onFileSelect={onFileSelect}
                   selectedFile={selectedFile}
                   onAddFile={onAddFile}
@@ -187,12 +170,24 @@ const TemplateFileTree = ({
                   onDeleteFolder={onDeleteFolder}
                   onRenameFile={onRenameFile}
                   onRenameFolder={onRenameFolder}
-                                  />)
-
-              }
-            </Sidebar>
+                />
+              ))
+            ) : (
+              <TemplateNode
+                item={data}
+                level={0}
+                path=""
+                onFileSelect={onFileSelect}
+                selectedFile={selectedFile}
+                onAddFile={onAddFile}
+                onAddFolder={onAddFolder}
+                onDeleteFile={onDeleteFile}
+                onDeleteFolder={onDeleteFolder}
+                onRenameFile={onRenameFile}
+                onRenameFolder={onRenameFolder}
+              />
+            )}
           </SidebarGroupContent>
-
         </SidebarGroup>
       </SidebarContent>
     </Sidebar>

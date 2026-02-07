@@ -128,6 +128,11 @@ const TemplateNode = ({
 
     return (
       <SidebarMenuItem>
+        <Collapsible
+          open={isOpen}
+          onOpenChange={setIsOpen}
+          className="group/collapsible    [&[data-state=open]>div>button>svg:first-child]:rotate-90"
+          >
         <div className="flex items-center group">
           <SidebarMenuButton className="flex-1">
             <File className="mr-2 h-4 w-4 shrink-0" />
@@ -156,6 +161,7 @@ const TemplateNode = ({
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+        </Collapsible>
       </SidebarMenuItem>
     );
   } else {
