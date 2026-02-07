@@ -158,11 +158,33 @@ const TemplateNode = ({
         </div>
       </SidebarMenuItem>
     );
+  } else {
+    const folder = item as TemplateFolder;
+    const folderName = folder.folderName;
+    const currentPath = path ? `${path}/${folderName}` : folderName;
+
+    return (
+      <SidebarMenuItem>
+        <Collapsible
+          open={isOpen}
+          onOpenChange={setIsOpen}
+          className="group/collapsible    [&[data-state=open]>div>button>svg:first-child]:rotate-90"
+        >
+          {" "}
+          {/* // rotate the chevron when open */}
+          <div className="flex items-center group">
+            <CollapsibleTrigger asChild>
+              <SidebarMenuButton className="flex-1">
+                <ChevronRight className="transition-transform" />
+                <Folder className="mr-2 h-4 w-4 shrink-0" />
+                <span>{folderName}</span>
+              </SidebarMenuButton>
+            </CollapsibleTrigger>
+          </div>
+        </Collapsible>
+      </SidebarMenuItem>
+    );
   }
-  else{
-    
-  }
-  return <h1>Folder</h1>;
 };
 
 export default TemplateNode;
