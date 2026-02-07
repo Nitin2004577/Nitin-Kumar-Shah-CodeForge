@@ -1,197 +1,93 @@
-"use client";
-import * as React from "react";
-import {
-  ChevronRight,
-  File,
-  Folder,
-  Plus,
-  FilePlus,
-  FolderPlus,
-  MoreHorizontal,
-  Trash2,
-  Edit3,
-} from "lucide-react";
+"use client"
 
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupAction,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
-  SidebarMenuSub,
-  SidebarRail,
-} from "@/components/ui/sidebar";
+import { useState } from "react"
+import { ChevronRight, File, Folder } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
-
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import TemplateNode from "./template-node";
-
-// Using the provided interfaces
-interface TemplateFile {
-  filename: string;
-  fileExtension: string;
-  content: string;
+interface FileItem {
+  filename: string
+  fileextension?: string
+  content: string
+  type: "file"
 }
 
-interface TemplateFolder {
-  folderName: string;
-  items: (TemplateFile | TemplateFolder)[];
+interface FolderItem {
+  foldername: string
+  items: (FileItem | FolderItem)[]
+  type: "folder"
 }
 
-// Union type for items in the file system
-type TemplateItem = TemplateFile | TemplateFolder;
+type FileSystemItem = FileItem | FolderItem
 
-// Consistent interface for the individual Node
-interface TemplateNodeProps {
-  item: TemplateItem;
-  onFileSelect?: (file: TemplateFile) => void; // Function type
-  selectedFile?: TemplateFile;
-  level: number;
-  path?: string;
-  onAddFile?: (file: TemplateFile, parentPath: string[]) => void;
-  onAddFolder?: (folder: TemplateFolder, parentPath: string[]) => void;
-  onDeleteFile?: (file: TemplateItem, parentPath: string[]) => void;
-  onDeleteFolder?: (folder: TemplateFolder, parentPath: string[]) => void;
-  onRenameFile?: (file: TemplateItem, newName: string, parentPath: string[]) => void;
-  onRenameFolder?: (folder: TemplateFolder, newName: string, parentPath: string[]) => void;
+interface FileTreeProps {
+  data: FileSystemItem
+  onFileSelect: (file: FileItem) => void
+  selectedFile?: FileItem
 }
 
-// Consistent interface for the Main Tree
-interface TemplateFileTreeProps {
-  data: TemplateItem;
-  onFileSelect?: (file: TemplateFile) => void; // Fixed: Function type matches TemplateNodeProps
-  selectedFile?: TemplateFile;
-  title?: string;
-  onAddFile?: (file: TemplateFile, parentPath: string[]) => void;
-  onAddFolder?: (folder: TemplateFolder, parentPath: string[]) => void;
-  onDeleteFile?: (file: TemplateItem, parentPath: string[]) => void;
-  onDeleteFolder?: (folder: TemplateFolder, parentPath: string[]) => void;
-  onRenameFile?: (
-    file: TemplateItem,
-    newName: string,
-    parentPath: string[]
-  ) => void;
-  onRenameFolder?: (
-    folder: TemplateFolder,
-    newName: string,
-    parentPath: string[]
-  ) => void;
-}
-
-const TemplateFileTree = ({
-  data,
-  onFileSelect,
-  selectedFile,
-  title = "Files Explorer",
-  onAddFile,
-  onAddFolder,
-  onDeleteFile,
-  onDeleteFolder,
-  onRenameFile,
-  onRenameFolder,
-}: TemplateFileTreeProps) => {
-  const isRootFolder = data && typeof data === "object" && "folderName" in data;
-
+export function FileTree({ data, onFileSelect, selectedFile }: FileTreeProps) {
   return (
-    <Sidebar>
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>{title}</SidebarGroupLabel>
+    <div className="w-full overflow-auto">
+      <FileTreeNode item={data} onFileSelect={onFileSelect} selectedFile={selectedFile} level={0} />
+    </div>
+  )
+}
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <SidebarGroupAction>
-                <Plus className="h-4 w-4" />
-              </SidebarGroupAction>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => {}}>
-                <FilePlus className="h-4 w-4 mr-2" />
-                New File
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => {}}>
-                <FolderPlus className="h-4 w-4 mr-2" />
-                New Folder
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+interface FileTreeNodeProps {
+  item: FileSystemItem
+  onFileSelect: (file: FileItem) => void
+  selectedFile?: FileItem
+  level: number
+}
 
-          <SidebarGroupContent>
-            {/* Removed nested Sidebar tag to fix layout issues */}
-            {isRootFolder ? (
-              (data as TemplateFolder).items.map((child, index) => (
-                <TemplateNode
-                  key={`${index}-${"folderName" in child ? child.folderName : child.filename}`}
-                  item={child}
-                  level={0}
-                  path=""
-                  onFileSelect={onFileSelect}
-                  selectedFile={selectedFile}
-                  onAddFile={onAddFile}
-                  onAddFolder={onAddFolder}
-                  onDeleteFile={onDeleteFile}
-                  onDeleteFolder={onDeleteFolder}
-                  onRenameFile={onRenameFile}
-                  onRenameFolder={onRenameFolder}
-                />
-              ))
-            ) : (
-              <TemplateNode
-                item={data}
-                level={0}
-                path=""
+function FileTreeNode({ item, onFileSelect, selectedFile, level }: FileTreeNodeProps) {
+  const [expanded, setExpanded] = useState(level < 1)
+
+  if (item.type === "file") {
+    const isSelected =
+      selectedFile && selectedFile.filename === item.filename && selectedFile.fileextension === item.fileextension
+
+    const fileName = item.fileextension ? `${item.filename}.${item.fileextension}` : item.filename
+
+    return (
+      <div
+        className={cn(
+          "flex items-center py-1 px-2 text-sm cursor-pointer hover:bg-accent/50 rounded-md",
+          isSelected && "bg-accent text-accent-foreground",
+        )}
+        onClick={() => onFileSelect(item)}
+      >
+        <File className="h-4 w-4 mr-2 shrink-0" />
+        <span className="truncate">{fileName}</span>
+      </div>
+    )
+  }
+
+  if (item.type === "folder") {
+    return (
+      <div>
+        <Collapsible open={expanded} onOpenChange={setExpanded} className="w-full">
+          <CollapsibleTrigger className="flex items-center py-1 px-2 text-sm w-full hover:bg-accent/50 rounded-md">
+            <ChevronRight className={cn("h-4 w-4 mr-1 shrink-0 transition-transform", expanded && "rotate-90")} />
+            <Folder className="h-4 w-4 mr-2 shrink-0" />
+            <span className="truncate">{item.foldername}</span>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="pl-4 border-l border-border/50 ml-3 mt-1">
+            {item.items.map((childItem, index) => (
+              <FileTreeNode
+                key={index}
+                item={childItem}
                 onFileSelect={onFileSelect}
                 selectedFile={selectedFile}
-                onAddFile={onAddFile}
-                onAddFolder={onAddFolder}
-                onDeleteFile={onDeleteFile}
-                onDeleteFolder={onDeleteFolder}
-                onRenameFile={onRenameFile}
-                onRenameFolder={onRenameFolder}
+                level={level + 1}
               />
-            )}
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-    </Sidebar>
-  );
-};
+            ))}
+          </CollapsibleContent>
+        </Collapsible>
+      </div>
+    )
+  }
 
-export default TemplateFileTree;
+  return null
+}
