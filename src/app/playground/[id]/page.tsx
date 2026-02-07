@@ -69,9 +69,13 @@ const MainPlaygroundPage: React.FC = () => {
     return (
       <div className="flex flex-col items-center justify-center h-screen p-4 text-center">
         <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
-        <h2 className="text-xl font-semibold text-red-600">Something went wrong</h2>
+        <h2 className="text-xl font-semibold text-red-600">
+          Something went wrong
+        </h2>
         <p className="text-muted-foreground mb-4">{error}</p>
-        <Button onClick={() => window.location.reload()} variant="outline">Try Again</Button>
+        <Button onClick={() => window.location.reload()} variant="outline">
+          Try Again
+        </Button>
       </div>
     );
   }
@@ -81,7 +85,9 @@ const MainPlaygroundPage: React.FC = () => {
     return (
       <div className="flex flex-col items-center justify-center h-screen p-4">
         <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
-        <p className="text-sm font-medium text-muted-foreground">Loading Playground...</p>
+        <p className="text-sm font-medium text-muted-foreground">
+          Loading Playground...
+        </p>
       </div>
     );
   }
@@ -90,8 +96,10 @@ const MainPlaygroundPage: React.FC = () => {
     <TooltipProvider>
       <div className="flex h-screen overflow-hidden">
         <TemplateFileTree
-          data={templateData}
+          // Use the nullish coalescing operator to provide a safe default
+          data={templateData || { folderName: "root", items: [] }}
           onFileSelect={handleFileSelect}
+          // activeFile is 'any' or 'OpenFile | null', which matches 'TemplateFile | undefined'
           selectedFile={activeFile}
           title="File Explorer"
         />
@@ -102,7 +110,9 @@ const MainPlaygroundPage: React.FC = () => {
             <Separator orientation="vertical" className="mr-2 h-4" />
             <div className="flex flex-1 items-center gap-2">
               <div className="flex flex-col flex-1">
-                <h1 className="text-sm font-medium">{playgroundData?.name || "Code Playground"}</h1>
+                <h1 className="text-sm font-medium">
+                  {playgroundData?.name || "Code Playground"}
+                </h1>
                 <p className="text-xs text-muted-foreground">
                   {openFiles.length} file(s) open
                 </p>
@@ -141,7 +151,10 @@ const MainPlaygroundPage: React.FC = () => {
             {openFiles.length > 0 ? (
               <>
                 <div className="border-b bg-muted/30">
-                  <Tabs value={activeFileId || ""} onValueChange={setActiveFileId}>
+                  <Tabs
+                    value={activeFileId || ""}
+                    onValueChange={setActiveFileId}
+                  >
                     <div className="flex items-center px-4 py-2">
                       <TabsList className="h-8 bg-transparent p-0">
                         {openFiles.map((file) => (
@@ -152,7 +165,9 @@ const MainPlaygroundPage: React.FC = () => {
                           >
                             <div className="flex items-center gap-2">
                               <FileText className="h-3 w-3" />
-                              <span>{file.filename}.{file.fileExtension}</span>
+                              <span>
+                                {file.filename}.{file.fileExtension}
+                              </span>
                               <X className="h-3 w-3 ml-2 opacity-50 hover:opacity-100 cursor-pointer" />
                             </div>
                           </TabsTrigger>
@@ -163,10 +178,12 @@ const MainPlaygroundPage: React.FC = () => {
                 </div>
 
                 <div className="flex-1 p-6 bg-slate-50 overflow-auto font-mono text-sm">
-                   <div className="p-4 border rounded bg-white shadow-sm">
-                      <p className="text-slate-400 mb-2 border-b pb-2">// File View Placeholder</p>
-                      <pre>{activeFile?.content || "No content available"}</pre>
-                   </div>
+                  <div className="p-4 border rounded bg-white shadow-sm">
+                    <p className="text-slate-400 mb-2 border-b pb-2">
+                      // File View Placeholder
+                    </p>
+                    <pre>{activeFile?.content || "No content available"}</pre>
+                  </div>
                 </div>
               </>
             ) : (
@@ -174,7 +191,9 @@ const MainPlaygroundPage: React.FC = () => {
                 <FolderOpen className="h-16 w-16 text-gray-300" />
                 <div className="text-center">
                   <p className="text-lg font-medium">No files open</p>
-                  <p className="text-sm text-gray-500">Select a file from the sidebar</p>
+                  <p className="text-sm text-gray-500">
+                    Select a file from the sidebar
+                  </p>
                 </div>
               </div>
             )}
@@ -187,7 +206,9 @@ const MainPlaygroundPage: React.FC = () => {
           description={confirmationDialog.description}
           onConfirm={confirmationDialog.onConfirm}
           onCancel={confirmationDialog.onCancel}
-          setIsOpen={(open) => setConfirmationDialog((prev) => ({ ...prev, isOpen: open }))}
+          setIsOpen={(open) =>
+            setConfirmationDialog((prev) => ({ ...prev, isOpen: open }))
+          }
         />
       </div>
     </TooltipProvider>
