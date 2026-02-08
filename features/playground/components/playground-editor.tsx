@@ -42,6 +42,14 @@ export const PlaygroundEditor = ({
     id: string;
   } | null>(null);
   const isAcceptingSuggestionRef = useRef(false);
+
+  const activeFileRef = useRef(activeFile);
+
+// 2. Add this useEffect to keep the ref always updated with the LATEST file
+useEffect(() => {
+  activeFileRef.current = activeFile;
+}, [activeFile]);
+
   const suggestionAcceptedRef = useRef(false);
   const suggestionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const tabCommandRef = useRef<any>(null);
@@ -323,7 +331,7 @@ export const PlaygroundEditor = ({
 
       const language = getEditorLanguage(activeFile?.fileExtension || "");
       const provider = createInlineCompletionProvider(monaco);
-
+      console.log("Code language: ", language)
       inlineCompletionProviderRef.current =
         monaco.languages.registerInlineCompletionsProvider(language, provider);
 
@@ -565,21 +573,32 @@ export const PlaygroundEditor = ({
   }, [activeFile]);
 
   // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (suggestionTimeoutRef.current) {
-        clearTimeout(suggestionTimeoutRef.current);
-      }
-      if (inlineCompletionProviderRef.current) {
-        inlineCompletionProviderRef.current.dispose();
-        inlineCompletionProviderRef.current = null;
-      }
-      if (tabCommandRef.current) {
+ useEffect(() => {
+  return () => {
+    // 1. Clear timers
+    if (suggestionTimeoutRef.current) {
+      clearTimeout(suggestionTimeoutRef.current);
+    }
+    
+    // 2. Dispose AI Provider
+    inlineCompletionProviderRef.current?.dispose();
+    inlineCompletionProviderRef.current = null;
+    
+    // 3. Dispose Tab Command (SAFE CHECK)
+    // We check if it exists before logging/disposing
+   if (tabCommandRef.current && typeof tabCommandRef.current.dispose === 'function') {
         tabCommandRef.current.dispose();
-        tabCommandRef.current = null;
-      }
-    };
-  }, []);
+    
+    // Clear the ref regardless
+    tabCommandRef.current = null;
+    } else {
+        console.log("Tab command was already null - nothing to dispose");
+    }
+
+    // 4. Log the file extension using the LIVE REF
+    console.log("File extension on close: ", activeFileRef.current?.fileExtension);
+  };
+}, []);
 
   return (
     <div className="h-full relative">
@@ -609,9 +628,12 @@ export const PlaygroundEditor = ({
             ? getEditorLanguage(activeFile.fileExtension || "")
             : "plaintext"
         }
+        
         // Cast the options to 'any' to resolve the 'lineNumbers' type mismatch
         options={defaultEditorOptions as any}
       />
+
+      
     </div>
   );
 };
