@@ -210,20 +210,7 @@ const TemplateSelectionModal = ({
     setStep("select");
   };
 
-  const renderStars = (count: number) => {
-    return Array(5)
-      .fill(0)
-      .map((_, i) => (
-        <Star
-          key={i}
-          size={14}
-          className={
-            i < count ? "fill-yellow-400 text-yellow-400" : "text-gray-300"
-          }
-        />
-      ));
-  };
-
+ 
   return (
     <Dialog
       open={isOpen}
@@ -297,9 +284,7 @@ const TemplateSelectionModal = ({
                           }`}
                         onClick={() => handleSelectTemplate(template.id)}
                       >
-                        <div className="absolute top-4 right-4 flex gap-1">
-                          {renderStars(template.popularity)}
-                        </div>
+                       
 
                         {selectedTemplate === template.id && (
                           <div className="absolute top-2 left-2 bg-[#E93F3F] text-white rounded-full p-1">
