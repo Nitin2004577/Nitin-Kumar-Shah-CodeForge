@@ -210,7 +210,6 @@ const TemplateSelectionModal = ({
     setStep("select");
   };
 
- 
   return (
     <Dialog
       open={isOpen}
@@ -284,8 +283,6 @@ const TemplateSelectionModal = ({
                           }`}
                         onClick={() => handleSelectTemplate(template.id)}
                       >
-                       
-
                         {selectedTemplate === template.id && (
                           <div className="absolute top-2 left-2 bg-[#E93F3F] text-white rounded-full p-1">
                             <Check size={14} />
