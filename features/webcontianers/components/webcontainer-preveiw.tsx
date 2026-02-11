@@ -1,20 +1,17 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
-import dynamic from "next/dynamic"; // 1. Import dynamic
+import dynamic from "next/dynamic";
 import type { TemplateFolder } from "@/../../features/playground/lib/path-to-json";
 import { transformToWebContainerFormat } from "../hooks/transformer";
 import { CheckCircle, Loader2, XCircle } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { WebContainer } from "@webcontainer/api";
 
-// 2. Remove static import
-// import TerminalComponent from "./terminal";
-
-// 3. Create Dynamic Import with SSR disabled
+// Dynamic import to prevent SSR issues with xterm.js
 const TerminalComponent = dynamic(() => import("./terminal"), { 
   ssr: false,
-  loading: () => <div className="h-full w-full bg-[#1e1e1e]" /> // Optional placeholder while loading
+  loading: () => <div className="h-full w-full bg-[#1e1e1e]" />
 });
 
 interface WebContainerPreviewProps {
@@ -44,14 +41,26 @@ const WebContainerPreview: React.FC<WebContainerPreviewProps> = ({
     starting: false,
     ready: false,
   });
+  
+  // NEW: State to track if terminal is ready
+  const [isTerminalReady, setIsTerminalReady] = useState(false);
+
   const [currentStep, setCurrentStep] = useState(0);
   const totalSteps = 4;
   const [setupError, setSetupError] = useState<string | null>(null);
   const [isSetupComplete, setIsSetupComplete] = useState(false);
   const [isSetupInProgress, setIsSetupInProgress] = useState(false);
   
-  // Ref to access terminal methods
   const terminalRef = useRef<any>(null);
+
+  // 1. Wait for Terminal to mount before allowing setup to start
+  useEffect(() => {
+    // Give the dynamic terminal 1.5 seconds to fully load into the DOM
+    const timer = setTimeout(() => {
+        setIsTerminalReady(true);
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Reset setup state when forceResetup changes
   useEffect(() => {
@@ -72,23 +81,21 @@ const WebContainerPreview: React.FC<WebContainerPreviewProps> = ({
 
   useEffect(() => {
     async function setupContainer() {
-      // Don't run setup if it's already complete or in progress
-      if (!instance || isSetupComplete || isSetupInProgress) return;
+      // 2. Add !isTerminalReady to the guard clause
+      if (!instance || !isTerminalReady || isSetupComplete || isSetupInProgress) return;
 
       try {
         setIsSetupInProgress(true);
         setSetupError(null);
         
-        // Check if server is already running by testing if files are already mounted
+        // Check if files exist (reconnect logic)
         try {
           const packageJsonExists = await instance.fs.readFile('package.json', 'utf8');
           if (packageJsonExists) {
-            // Files are already mounted, just reconnect to existing server
             if (terminalRef.current?.writeToTerminal) {
               terminalRef.current.writeToTerminal("🔄 Reconnecting to existing WebContainer session...\r\n");
             }
             
-            // Check if server is already running
             instance.on("server-ready", (port: number, url: string) => {
               console.log(`Reconnected to server on port ${port} at ${url}`);
               if (terminalRef.current?.writeToTerminal) {
@@ -109,14 +116,13 @@ const WebContainerPreview: React.FC<WebContainerPreviewProps> = ({
             return;
           }
         } catch (e) {
-          // Files don't exist, proceed with normal setup
+          // Proceed with normal setup
         }
         
         // Step 1: Transform data
         setLoadingState((prev) => ({ ...prev, transforming: true }));
         setCurrentStep(1);
         
-        // Write to terminal
         if (terminalRef.current?.writeToTerminal) {
           terminalRef.current.writeToTerminal("🔄 Transforming template data...\r\n");
         }
@@ -156,11 +162,9 @@ const WebContainerPreview: React.FC<WebContainerPreviewProps> = ({
         
         const installProcess = await instance.spawn("npm", ["install"]);
 
-        // Stream install output to terminal
         installProcess.output.pipeTo(
           new WritableStream({
             write(data) {
-              // Write directly to terminal
               if (terminalRef.current?.writeToTerminal) {
                 terminalRef.current.writeToTerminal(data);
               }
@@ -192,7 +196,6 @@ const WebContainerPreview: React.FC<WebContainerPreviewProps> = ({
         
         const startProcess = await instance.spawn("npm", ["run", "start"]);
 
-        // Listen for server ready event
         instance.on("server-ready", (port: number, url: string) => {
           console.log(`Server ready on port ${port} at ${url}`);
           if (terminalRef.current?.writeToTerminal) {
@@ -208,7 +211,6 @@ const WebContainerPreview: React.FC<WebContainerPreviewProps> = ({
           setIsSetupInProgress(false);
         });
 
-        // Handle start process output - stream to terminal
         startProcess.output.pipeTo(
           new WritableStream({
             write(data) {
@@ -240,14 +242,12 @@ const WebContainerPreview: React.FC<WebContainerPreviewProps> = ({
     }
 
     setupContainer();
-  }, [instance, templateData, isSetupComplete, isSetupInProgress]);
+    // 3. Add isTerminalReady to dependency array
+  }, [instance, templateData, isSetupComplete, isSetupInProgress, isTerminalReady]);
 
-  // Cleanup function to prevent memory leaks
+  // Cleanup
   useEffect(() => {
-    return () => {
-      // Don't kill processes or cleanup when component unmounts
-      // The WebContainer should persist across component re-mounts
-    };
+    return () => {};
   }, []);
 
   if (isLoading) {
@@ -308,13 +308,10 @@ const WebContainerPreview: React.FC<WebContainerPreviewProps> = ({
       {!previewUrl ? (
         <div className="h-full flex flex-col">
           <div className="w-full max-w-md p-6 m-5 rounded-lg bg-white dark:bg-zinc-800 shadow-sm mx-auto">
-            
-
             <Progress
               value={(currentStep / totalSteps) * 100}
               className="h-2 mb-6"
             />
-
             <div className="space-y-4 mb-6">
               <div className="flex items-center gap-3">
                 {getStepIcon(1)}
