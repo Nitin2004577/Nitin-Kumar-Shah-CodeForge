@@ -1,12 +1,21 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
+import dynamic from "next/dynamic"; // 1. Import dynamic
 import type { TemplateFolder } from "@/../../features/playground/lib/path-to-json";
 import { transformToWebContainerFormat } from "../hooks/transformer";
 import { CheckCircle, Loader2, XCircle } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
-import TerminalComponent from "./terminal";
 import { WebContainer } from "@webcontainer/api";
+
+// 2. Remove static import
+// import TerminalComponent from "./terminal";
+
+// 3. Create Dynamic Import with SSR disabled
+const TerminalComponent = dynamic(() => import("./terminal"), { 
+  ssr: false,
+  loading: () => <div className="h-full w-full bg-[#1e1e1e]" /> // Optional placeholder while loading
+});
 
 interface WebContainerPreviewProps {
   templateData: TemplateFolder;
@@ -15,7 +24,7 @@ interface WebContainerPreviewProps {
   error: string | null;
   instance: WebContainer | null;
   writeFileSync: (path: string, content: string) => Promise<void>;
-  forceResetup?: boolean; // Optional prop to force re-setup
+  forceResetup?: boolean;
 }
 
 const WebContainerPreview: React.FC<WebContainerPreviewProps> = ({
@@ -299,7 +308,7 @@ const WebContainerPreview: React.FC<WebContainerPreviewProps> = ({
       {!previewUrl ? (
         <div className="h-full flex flex-col">
           <div className="w-full max-w-md p-6 m-5 rounded-lg bg-white dark:bg-zinc-800 shadow-sm mx-auto">
-           
+            
 
             <Progress
               value={(currentStep / totalSteps) * 100}
