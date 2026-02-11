@@ -1,297 +1,51 @@
 "use client";
 
-import React, { useRef } from "react";
-import { useState, useCallback } from "react";
-import { Separator } from "@/components/ui/separator";
-import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
-import { TemplateFileTree } from "@/../../features/playground/components/playground-explorer";
-import type { TemplateFile } from "@/../../features/playground/lib/path-to-json";
+import React from "react";
 import { useParams } from "next/navigation";
-import { toast } from "sonner";
-import {
-  FileText,
-  FolderOpen,
-  AlertCircle,
-  Save,
-  X,
-  Settings, 
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { FileText, X } from "lucide-react";
 
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable";
+// UI Components
+import { SidebarInset } from "@/components/ui/sidebar";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import LoadingStep from "@/components/ui/loader";
-import { PlaygroundEditor } from "@/../../features/playground/components/playground-editor";
-import { useFileExplorer } from "@/../../features/playground/hooks/useFileExplorer";
-import { usePlayground } from "@/../../features/playground/hooks/usePlayground";
-import { TemplateFolder } from "@/../../features/playground/types";
-import { findFilePath } from "@/../../features/playground/lib";
-import { ConfirmationDialog } from "@/../../features/playground/components/dialogs/conformation-dialog";
+
+// Feature Components
+import { TemplateFileTree } from "@/../features/playground/components/playground-explorer";
+import { ConfirmationDialog } from "@/../features/playground/components/dialogs/conformation-dialog";
+import { PlaygroundHeader } from "@/../features/playground/components/playground-header";
+import { PlaygroundWorkspace } from "@/../features/playground/components/playground-workspace";
+
+// Hooks
+import { usePlayground } from "@/../features/playground/hooks/usePlayground";
+import { useFileExplorer } from "@/../features/playground/hooks/useFileExplorer";
+import { useAISuggestions } from "@/../features/playground/hooks/useAISuggestion";
+import { usePlaygroundLogic } from "@/../features/playground/hooks/usePlaygroundLogic";
 
 const MainPlaygroundPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
 
-  // UI state
-  const [confirmationDialog, setConfirmationDialog] = useState({
-    isOpen: false,
-    title: "",
-    description: "",
-    onConfirm: () => {},
-    onCancel: () => {},
-  });
-
-  const [isPreviewVisible, setIsPreviewVisible] = useState(true);
-
-  // Custom hooks
+  // 1. Global Stores & Data
   const { playgroundData, templateData, isLoading, error, saveTemplateData } =
     usePlayground(id);
+  const explorer = useFileExplorer();
+  const ai = useAISuggestions();
 
-  const {
-    activeFileId,
-    closeAllFiles,
-    openFile,
-    closeFile,
-    handleAddFile,
-    handleAddFolder,
-    handleDeleteFile,
-    handleDeleteFolder,
-    handleRenameFile,
-    handleRenameFolder,
-    openFiles,
-    setTemplateData,
-    setActiveFileId,
-    setPlaygroundId,
-    setOpenFiles,
-  } = useFileExplorer();
+  // 2. Local Controller Logic (The "Brain" Hook)
+  const logic = usePlaygroundLogic(id, templateData, saveTemplateData);
 
-  // Set template data when playground loads
-  React.useEffect(() => {
-    setPlaygroundId(id);
-  }, [id, setPlaygroundId]);
-
-  // Initialize zustand templateData from usePlayground only on first load
-  React.useEffect(() => {
-    if (templateData && !openFiles.length) {
-      setTemplateData(templateData);
-    }
-  }, [templateData, setTemplateData, openFiles.length]);
-
-  // Create wrapper functions that pass saveTemplateData
-  const wrappedHandleAddFile = useCallback(
-    (newFile: TemplateFile, parentPath: string) => {
-      return handleAddFile(
-        newFile,
-        parentPath,
-        async (path: string, content: string) => {},
-        undefined as any,
-        saveTemplateData
-      );
-    },
-    [handleAddFile, saveTemplateData]
-  );
-
-  const wrappedHandleAddFolder = useCallback(
-    (newFolder: TemplateFolder, parentPath: string) => {
-      // @ts-ignore
-      return handleAddFolder(
-        newFolder,
-        parentPath,
-        undefined,
-        saveTemplateData
-      );
-    },
-    [handleAddFolder, saveTemplateData]
-  );
-
-  const wrappedHandleDeleteFile = useCallback(
-    (file: TemplateFile, parentPath: string) => {
-      return handleDeleteFile(file, parentPath, saveTemplateData);
-    },
-    [handleDeleteFile, saveTemplateData]
-  );
-
-  const wrappedHandleDeleteFolder = useCallback(
-    (folder: TemplateFolder, parentPath: string) => {
-      return handleDeleteFolder(folder, parentPath, saveTemplateData);
-    },
-    [handleDeleteFolder, saveTemplateData]
-  );
-
-  const wrappedHandleRenameFile = useCallback(
-    (
-      file: TemplateFile,
-      newFilename: string,
-      newExtension: string,
-      parentPath: string
-    ) => {
-      return handleRenameFile(
-        file,
-        newFilename,
-        newExtension,
-        parentPath,
-        saveTemplateData
-      );
-    },
-    [handleRenameFile, saveTemplateData]
-  );
-
-  const wrappedHandleRenameFolder = useCallback(
-    (folder: TemplateFolder, newFolderName: string, parentPath: string) => {
-      return handleRenameFolder(
-        folder,
-        newFolderName,
-        parentPath,
-        saveTemplateData
-      );
-    },
-    [handleRenameFolder, saveTemplateData]
-  );
-
-  const activeFile = openFiles.find((file) => file.id === activeFileId);
-  const hasUnsavedChanges = openFiles.some((file) => file.hasUnsavedChanges);
-
-  const handleFileSelect = (file: TemplateFile) => {
-    openFile(file);
-  };
-
-  // ----------------------------------------------------------------
-  // FIX: Added handler for editor content changes
-  // ----------------------------------------------------------------
-  const handleEditorChange = (value: string | undefined) => {
-    if (!activeFile || value === undefined) return;
-
-    // Update the open files state with new content and unsaved flag
-    const updatedFiles = openFiles.map((f) =>
-      f.id === activeFile.id
-        ? { ...f, content: value, hasUnsavedChanges: true }
-        : f
-    );
-    setOpenFiles(updatedFiles);
-  };
-
-  const handleSave = useCallback(
-    async (fileId?: string) => {
-      const targetFileId = fileId || activeFileId;
-      if (!targetFileId) return;
-
-      const fileToSave = openFiles.find((f) => f.id === targetFileId);
-      if (!fileToSave) return;
-
-      const latestTemplateData = useFileExplorer.getState().templateData;
-      if (!latestTemplateData) return;
-
-      try {
-        const filePath = findFilePath(fileToSave, latestTemplateData);
-        if (!filePath) {
-          toast.error(
-            `Could not find path for file: ${fileToSave.filename}.${fileToSave.fileExtension}`
-          );
-          return;
-        }
-
-        const updatedTemplateData = JSON.parse(
-          JSON.stringify(latestTemplateData)
-        );
-
-        const updateFileContent = (items: any[]): any[] =>
-          items.map((item) => {
-            if ("folderName" in item) {
-              return { ...item, items: updateFileContent(item.items) };
-            } else if (
-              item.filename === fileToSave.filename &&
-              item.fileExtension === fileToSave.fileExtension
-            ) {
-              return { ...item, content: fileToSave.content };
-            }
-            return item;
-          });
-
-        updatedTemplateData.items = updateFileContent(
-          updatedTemplateData.items
-        );
-
-        await saveTemplateData(updatedTemplateData);
-        setTemplateData(updatedTemplateData);
-
-        const updatedOpenFiles = openFiles.map((f) =>
-          f.id === targetFileId
-            ? {
-                ...f,
-                content: fileToSave.content,
-                originalContent: fileToSave.content,
-                hasUnsavedChanges: false,
-              }
-            : f
-        );
-        setOpenFiles(updatedOpenFiles);
-
-        toast.success(
-          `Saved ${fileToSave.filename}.${fileToSave.fileExtension}`
-        );
-      } catch (error) {
-        console.error("Error saving file:", error);
-        toast.error(
-          `Failed to save ${fileToSave.filename}.${fileToSave.fileExtension}`
-        );
-        throw error;
-      }
-    },
-    [activeFileId, openFiles, saveTemplateData, setTemplateData, setOpenFiles]
-  );
-
-  const handleSaveAll = async () => {
-    const unsavedFiles = openFiles.filter((f) => f.hasUnsavedChanges);
-
-    if (unsavedFiles.length === 0) {
-      toast.info("No unsaved changes");
-      return;
-    }
-
-    try {
-      await Promise.all(unsavedFiles.map((f) => handleSave(f.id)));
-      toast.success(`Saved ${unsavedFiles.length} file(s)`);
-    } catch (error) {
-      toast.error("Failed to save some files");
-    }
-  };
-
-  React.useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.key === "s") {
-        e.preventDefault();
-        handleSave();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleSave]);
-
-  if (error) {
+  // --- Render States ---
+  if (error || logic.containerError) {
     return (
-      <div className="flex flex-col items-center justify-center h-[calc(100vh-4rem)] p-4">
-        <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
-        <h2 className="text-xl font-semibold text-red-600 mb-2">
-          Something went wrong
-        </h2>
-        <p className="text-gray-600 mb-4">{error}</p>
-        <Button onClick={() => window.location.reload()} variant="destructive">
+      <div className="flex flex-col items-center justify-center h-[calc(100vh-4rem)] p-4 text-red-500">
+        <h2 className="text-xl font-semibold">Something went wrong</h2>
+        <p>{error || logic.containerError}</p>
+        <Button
+          onClick={() => window.location.reload()}
+          variant="destructive"
+          className="mt-4"
+        >
           Try Again
         </Button>
       </div>
@@ -301,23 +55,15 @@ const MainPlaygroundPage: React.FC = () => {
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-[calc(100vh-4rem)] p-4">
-        <div className="w-full max-w-md p-6 rounded-lg shadow-sm border">
+        <div className="w-full max-w-md p-6 rounded-lg border shadow-sm">
           <h2 className="text-xl font-semibold mb-6 text-center">
             Loading Playground
           </h2>
-          <div className="mb-8">
-            <LoadingStep
-              currentStep={1}
-              step={1}
-              label="Loading playground data"
-            />
-            <LoadingStep
-              currentStep={2}
-              step={2}
-              label="Setting up environment"
-            />
-            <LoadingStep currentStep={3} step={3} label="Ready to code" />
-          </div>
+          <LoadingStep
+            currentStep={2}
+            step={2}
+            label="Setting up environment"
+          />
         </div>
       </div>
     );
@@ -326,215 +72,156 @@ const MainPlaygroundPage: React.FC = () => {
   if (!templateData) {
     return (
       <div className="flex flex-col items-center justify-center h-[calc(100vh-4rem)] p-4">
-        <FolderOpen className="h-12 w-12 text-amber-500 mb-4" />
-        <h2 className="text-xl font-semibold text-amber-600 mb-2">
+        <h2 className="text-xl font-semibold text-amber-600">
           No template data available
         </h2>
-        <Button onClick={() => window.location.reload()} variant="outline">
-          Reload Template
+        <Button
+          onClick={() => window.location.reload()}
+          variant="outline"
+          className="mt-4"
+        >
+          Reload
         </Button>
       </div>
     );
   }
 
+  // Derived State
+  const activeFile = explorer.openFiles.find(
+    (f) => f.id === explorer.activeFileId
+  );
+  const hasUnsaved = explorer.openFiles.some((f) => f.hasUnsavedChanges);
+
   return (
     <TooltipProvider>
-      <>
-        <TemplateFileTree
-          data={templateData}
-          onFileSelect={handleFileSelect}
-          selectedFile={activeFile}
-          title="File Explorer"
-          onAddFile={wrappedHandleAddFile}
-          onAddFolder={wrappedHandleAddFolder}
-          onDeleteFile={wrappedHandleDeleteFile}
-          onDeleteFolder={wrappedHandleDeleteFolder}
-          onRenameFile={wrappedHandleRenameFile}
-          onRenameFolder={wrappedHandleRenameFolder}
-        />
+      {/* 1. Sidebar: File Explorer */}
+      <TemplateFileTree
+        data={templateData}
+        onFileSelect={explorer.openFile}
+        selectedFile={activeFile}
+        title="Explorer"
+        onAddFile={logic.actions.handleAddFile}
+        onAddFolder={logic.actions.handleAddFolder}
+        onDeleteFile={logic.actions.handleDeleteFile}
+        onDeleteFolder={logic.actions.handleDeleteFolder}
+        onRenameFile={logic.actions.handleRenameFile}
+        onRenameFolder={logic.actions.handleRenameFolder}
+      />
 
-        <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
-            <SidebarTrigger className="-ml-1" />
-            <Separator orientation="vertical" className="mr-2 h-4" />
-
-            <div className="flex flex-1 items-center gap-2">
-              <div className="flex flex-col flex-1">
-                <h1 className="text-sm font-medium">
-                  {playgroundData?.name || "Code Playground"}
-                </h1>
-                <p className="text-xs text-muted-foreground">
-                  {openFiles.length} file(s) open
-                  {hasUnsavedChanges && " • Unsaved changes"}
-                </p>
-              </div>
-
-              <div className="flex items-center gap-1">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleSave()}
-                      disabled={!activeFile || !activeFile.hasUnsavedChanges}
-                    >
-                      <Save className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Save (Ctrl+S)</TooltipContent>
-                </Tooltip>
-
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={handleSaveAll}
-                      disabled={!hasUnsavedChanges}
-                    >
-                      <Save className="h-4 w-4" /> All
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Save All (Ctrl+Shift+S)</TooltipContent>
-                </Tooltip>
-
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button size="sm" variant="outline">
-                      <Settings className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      onClick={() => setIsPreviewVisible(!isPreviewVisible)}
-                    >
-                      {isPreviewVisible ? "Hide" : "Show"} Preview
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={closeAllFiles}>
-                      Close All Files
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </div>
-          </header>
-
-          <div className="h-[calc(100vh-4rem)]">
-            {openFiles.length > 0 ? (
-              <div className="h-full flex flex-col">
-                {/* File Tabs */}
-                <div className="border-b bg-muted/30">
-                  <Tabs
-                    value={activeFileId || ""}
-                    onValueChange={setActiveFileId}
-                  >
-                    <div className="flex items-center justify-between px-4 py-2">
-                      <TabsList className="h-8 bg-transparent p-0">
-                        {openFiles.map((file) => (
-                          <TabsTrigger
-                            key={file.id}
-                            value={file.id}
-                            className="relative h-8 px-3 data-[state=active]:bg-background data-[state=active]:shadow-sm group"
-                          >
-                            <div className="flex items-center gap-2">
-                              <FileText className="h-3 w-3" />
-                              <span>
-                                {file.filename}.{file.fileExtension}
-                              </span>
-                              {file.hasUnsavedChanges && (
-                                <span className="h-2 w-2 rounded-full bg-orange-500" />
-                              )}
-                              <span
-                                className="ml-2 h-4 w-4 hover:bg-destructive hover:text-destructive-foreground rounded-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  closeFile(file.id);
-                                }}
-                              >
-                                <X className="h-3 w-3" />
-                              </span>
-                            </div>
-                          </TabsTrigger>
-                        ))}
-                      </TabsList>
-
-                      {openFiles.length > 1 && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={closeAllFiles}
-                          className="h-6 px-2 text-xs"
-                        >
-                          Close All
-                        </Button>
-                      )}
-                    </div>
-                  </Tabs>
-                </div>
-
-                {/* Editor and Preview */}
-                <div className="flex-1">
-                  <ResizablePanelGroup
-                    direction="horizontal"
-                    className="h-full"
-                  >
-                    <ResizablePanel defaultSize={isPreviewVisible ? 50 : 100}>
-                      {/* FIX: Passed required props and @ts-ignore for missing ones */}
-                      {/* @ts-ignore */}
-                      <PlaygroundEditor
-                        activeFile={activeFile}
-                        content={activeFile?.content || ""}
-                        onContentChange={handleEditorChange}
-                        suggestion={null}
-                        // FIX: Add these dummy functions to prevent crashes
-                        onTriggerSuggestion={() => {}} 
-                        onAcceptSuggestion={() => {}}
-                        onRejectSuggestion={() => {}}
-                      />
-                    </ResizablePanel>
-
-                    {isPreviewVisible && (
-                      <>
-                        <ResizableHandle />
-                        <ResizablePanel defaultSize={50}>
-                          <div className="flex flex-col items-center justify-center h-full text-muted-foreground bg-muted/10">
-                            <p className="font-medium">Preview not available</p>
-                            <p className="text-xs opacity-70 mt-1">
-                              WebContainer environment disabled
-                            </p>
-                          </div>
-                        </ResizablePanel>
-                      </>
-                    )}
-                  </ResizablePanelGroup>
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-col h-full items-center justify-center text-muted-foreground gap-4">
-                <FileText className="h-16 w-16 text-gray-300" />
-                <div className="text-center">
-                  <p className="text-lg font-medium">No files open</p>
-                  <p className="text-sm text-gray-500">
-                    Select a file from the sidebar to start editing
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-        </SidebarInset>
-
-        <ConfirmationDialog
-          isOpen={confirmationDialog.isOpen}
-          title={confirmationDialog.title}
-          description={confirmationDialog.description}
-          onConfirm={confirmationDialog.onConfirm}
-          onCancel={confirmationDialog.onCancel}
-          setIsOpen={(open) =>
-            setConfirmationDialog((prev) => ({ ...prev, isOpen: open }))
+      <SidebarInset>
+        {/* 2. Header */}
+        <PlaygroundHeader
+          title={playgroundData?.name || "Code Playground"}
+          openFilesCount={explorer.openFiles.length}
+          hasUnsavedChanges={hasUnsaved}
+          canSave={!!activeFile && activeFile.hasUnsavedChanges}
+          // FIXED: Access handleSave via logic.actions
+          onSave={() => logic.actions.handleSave()}
+          onSaveAll={logic.actions.handleSaveAll}
+          onTogglePreview={() =>
+            logic.setIsPreviewVisible(!logic.isPreviewVisible)
           }
+          isPreviewVisible={logic.isPreviewVisible}
+          onCloseAll={explorer.closeAllFiles}
+          aiProps={{
+            isEnabled: ai.isEnabled,
+            onToggle: ai.toggleEnabled,
+            isLoading: ai.isLoading,
+          }}
         />
-      </>
+
+        <div className="h-[calc(100vh-4rem)] flex flex-col">
+          {/* 3. File Tabs Area */}
+          {explorer.openFiles.length > 0 && (
+            <div className="border-b bg-muted/30 shrink-0">
+              <Tabs
+                value={explorer.activeFileId || ""}
+                onValueChange={explorer.setActiveFileId}
+              >
+                <div className="flex items-center justify-between px-4 py-2">
+                  <TabsList className="h-8 bg-transparent p-0 flex flex-nowrap overflow-x-auto no-scrollbar">
+                    {explorer.openFiles.map((file) => (
+                      <TabsTrigger
+                        key={file.id}
+                        value={file.id}
+                        className="relative h-8 px-3 data-[state=active]:bg-background data-[state=active]:shadow-sm group border-r border-transparent data-[state=active]:border-border/50 min-w-[100px]"
+                      >
+                        <div className="flex items-center gap-2 max-w-[200px]">
+                          <FileText className="h-3 w-3 shrink-0" />
+                          <span className="truncate">
+                            {file.filename}.{file.fileExtension}
+                          </span>
+                          {file.hasUnsavedChanges && (
+                            <span className="h-2 w-2 rounded-full bg-orange-500 shrink-0" />
+                          )}
+                          <span
+                            className="ml-1 h-4 w-4 hover:bg-destructive hover:text-destructive-foreground rounded-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              explorer.closeFile(file.id);
+                            }}
+                          >
+                            <X className="h-3 w-3" />
+                          </span>
+                        </div>
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+
+                  {explorer.openFiles.length > 1 && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={explorer.closeAllFiles}
+                      className="h-6 px-2 text-xs ml-2 shrink-0"
+                    >
+                      Close All
+                    </Button>
+                  )}
+                </div>
+              </Tabs>
+            </div>
+          )}
+
+          {/* 4. Main Workspace (Editor + Preview) */}
+          <PlaygroundWorkspace
+            activeFile={activeFile}
+            isPreviewVisible={logic.isPreviewVisible}
+            onContentChange={(val) => {
+              if (explorer.activeFileId) {
+                explorer.updateFileContent(explorer.activeFileId, val || "");
+              }
+            }}
+            ai={{
+              // FIXED: Convert 'null' to empty string to satisfy type 'string'
+              suggestion: ai.suggestion || "",
+              isLoading: ai.isLoading,
+              position: ai.position || { line: 0, column: 0 },
+              onAccept: ai.acceptSuggestion,
+              onReject: ai.rejectSuggestion,
+              onTrigger: ai.fetchSuggestion,
+            }}
+            preview={{
+              templateData: templateData!,
+              instance: logic.instance,
+              serverUrl: logic.serverUrl || "",
+              isLoading: logic.containerLoading,
+              error: logic.containerError,
+              writeFileSync: logic.writeFileSync,
+            }}
+          />
+        </div>
+      </SidebarInset>
+
+      {/* 5. Dialogs */}
+      <ConfirmationDialog
+        isOpen={logic.dialog.isOpen}
+        title={logic.dialog.title}
+        description={logic.dialog.description}
+        onConfirm={logic.dialog.onConfirm}
+        onCancel={logic.dialog.onCancel}
+        setIsOpen={logic.dialog.setIsOpen}
+      />
     </TooltipProvider>
   );
 };
