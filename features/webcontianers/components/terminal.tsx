@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from "react";
@@ -9,7 +8,7 @@ import { SearchAddon } from "xterm-addon-search";
 import "xterm/css/xterm.css";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Copy, Trash2, Download } from "lucide-react";
+import { Search, Copy, Trash2, Download, X } from "lucide-react"; // Added X icon
 import { cn } from "@/lib/utils";
 
 interface TerminalProps {
@@ -17,6 +16,7 @@ interface TerminalProps {
   className?: string;
   theme?: "dark" | "light";
   webContainerInstance?: any;
+  onClose?: () => void; // ✅ Added this to fix the error
 }
 
 export interface TerminalRef {
@@ -29,7 +29,8 @@ const TerminalComponent = forwardRef<TerminalRef, TerminalProps>(({
   webcontainerUrl, 
   className,
   theme = "dark",
-  webContainerInstance
+  webContainerInstance,
+  onClose // ✅ Destructured here
 }, ref) => {
   const terminalRef = useRef<HTMLDivElement>(null);
   const term = useRef<Terminal | null>(null);
@@ -41,7 +42,7 @@ const TerminalComponent = forwardRef<TerminalRef, TerminalProps>(({
   const [searchTerm, setSearchTerm] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   
-  // Refs for logic (to avoid stale closures in event listeners)
+  // Refs for logic
   const currentLine = useRef<string>("");
   const cursorPosition = useRef<number>(0);
   const commandHistory = useRef<string[]>([]);
@@ -63,10 +64,10 @@ const TerminalComponent = forwardRef<TerminalRef, TerminalProps>(({
 
   const terminalThemes = {
     dark: {
-      background: "#09090B", // Zinc-950
+      background: "#09090B",
       foreground: "#FAFAFA",
       cursor: "#FAFAFA",
-      selection: "#27272A", // Zinc-800
+      selection: "#27272A",
       black: "#18181B",
       red: "#EF4444",
       green: "#22C55E",
@@ -292,9 +293,12 @@ const TerminalComponent = forwardRef<TerminalRef, TerminalProps>(({
 
     // Handle Resize
     const resizeObserver = new ResizeObserver(() => {
-        // Small delay to ensure container has resized
         requestAnimationFrame(() => {
-            fit.fit();
+            try {
+                fit.fit();
+            } catch (e) {
+                // Ignore resize errors if terminal is hidden
+            }
         });
     });
     
@@ -306,7 +310,7 @@ const TerminalComponent = forwardRef<TerminalRef, TerminalProps>(({
       terminal.dispose();
       term.current = null;
     };
-  }, []); // Empty dependency array ensures this runs ONCE only
+  }, []);
 
   // --- Exposed Methods ---
   useImperativeHandle(ref, () => ({
@@ -331,10 +335,6 @@ const TerminalComponent = forwardRef<TerminalRef, TerminalProps>(({
   const clearTerminal = () => {
       term.current?.clear();
       writePrompt();
-  };
-
-  const downloadTerminalLog = () => {
-    // Implementation for downloading log (optional)
   };
 
   const performSearch = (text: string) => {
@@ -375,6 +375,17 @@ const TerminalComponent = forwardRef<TerminalRef, TerminalProps>(({
             <Button variant="ghost" size="icon" className="h-6 w-6 text-zinc-400 hover:text-white" onClick={clearTerminal}>
                 <Trash2 className="h-3 w-3" />
             </Button>
+            {/* ✅ Close Button - Conditional Rendering */}
+            {onClose && (
+                <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-6 w-6 text-zinc-400 hover:text-red-500 hover:bg-red-500/10" 
+                    onClick={onClose}
+                >
+                    <X className="h-3.5 w-3.5" /> 
+                </Button>
+            )}
          </div>
       </div>
 
