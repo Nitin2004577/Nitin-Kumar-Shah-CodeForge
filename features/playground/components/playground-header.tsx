@@ -3,7 +3,6 @@ import {
   Save, 
   PanelRightOpen, 
   PanelRightClose, 
-  MoreVertical, 
   Bot, 
   X,
   Settings
@@ -20,7 +19,6 @@ import {
   DropdownMenuLabel
 } from "@/components/ui/dropdown-menu";
 
-// 1. Define the props expected from MainPlaygroundPage
 interface PlaygroundHeaderProps {
   title: string;
   openFilesCount: number;
@@ -71,6 +69,28 @@ export const PlaygroundHeader: React.FC<PlaygroundHeaderProps> = ({
 
       {/* RIGHT: Actions */}
       <div className="flex items-center gap-2">
+        
+        {/* ✅ NEW: Preview Toggle Button (Moved Here) */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onTogglePreview}
+          className="h-8 gap-2 text-muted-foreground hover:text-foreground"
+          title={isPreviewVisible ? "Hide Preview" : "Show Preview"}
+        >
+          {isPreviewVisible ? (
+            <>
+              <PanelRightClose className="h-4 w-4" />
+              <span className="hidden sm:inline">Hide Preview</span>
+            </>
+          ) : (
+            <>
+              <PanelRightOpen className="h-4 w-4" />
+              <span className="hidden sm:inline">Show Preview</span>
+            </>
+          )}
+        </Button>
+
         {/* AI Toggle */}
         <Button
           variant={aiProps.isEnabled ? "secondary" : "ghost"}
@@ -102,13 +122,7 @@ export const PlaygroundHeader: React.FC<PlaygroundHeaderProps> = ({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuLabel>View Options</DropdownMenuLabel>
-            <DropdownMenuItem onClick={onTogglePreview}>
-              {isPreviewVisible ? <PanelRightClose className="mr-2 h-4 w-4"/> : <PanelRightOpen className="mr-2 h-4 w-4"/>}
-              {isPreviewVisible ? "Hide Preview" : "Show Preview"}
-            </DropdownMenuItem>
-            
-            <DropdownMenuSeparator />
+            {/* Removed "View Options" section since we moved the button out */}
             
             <DropdownMenuLabel>File Actions</DropdownMenuLabel>
             <DropdownMenuItem onClick={onSave} disabled={!canSave}>
@@ -117,6 +131,9 @@ export const PlaygroundHeader: React.FC<PlaygroundHeaderProps> = ({
             <DropdownMenuItem onClick={onSaveAll} disabled={!hasUnsavedChanges}>
               <Save className="mr-2 h-4 w-4" /> Save All
             </DropdownMenuItem>
+            
+            <DropdownMenuSeparator />
+            
             <DropdownMenuItem onClick={onCloseAll} disabled={openFilesCount === 0} className="text-destructive">
               <X className="mr-2 h-4 w-4" /> Close All
             </DropdownMenuItem>
