@@ -1,8 +1,12 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { FileText, X } from "lucide-react";
+
+// Git Imports
+import git from "isomorphic-git";
+import http from "isomorphic-git/http/web";
 
 // UI Components
 import { SidebarInset } from "@/components/ui/sidebar";
@@ -16,6 +20,7 @@ import { TemplateFileTree } from "@/../features/playground/components/playground
 import { ConfirmationDialog } from "@/../features/playground/components/dialogs/conformation-dialog";
 import { PlaygroundHeader } from "@/../features/playground/components/playground-header";
 import { PlaygroundWorkspace } from "@/../features/playground/components/playground-workspace";
+import { GithubSettingsModal } from "@/../features/playground/components/github-settings-modal";
 
 // Hooks
 import { usePlayground } from "@/../features/playground/hooks/usePlayground";
@@ -43,17 +48,122 @@ const MainPlaygroundPage: React.FC = () => {
   // 2. Local Controller Logic (The "Brain" Hook)
   const logic = usePlaygroundLogic(id, templateData, saveTemplateData);
 
+  // 3. Git & Modal States
+  const [isPushing, setIsPushing] = useState(false);
+  const [isGitModalOpen, setIsGitModalOpen] = useState(false);
+  const [gitSettings, setGitSettings] = useState({ token: "", repoUrl: "" });
+
+  // 4. Load saved Git settings from browser storage
+  useEffect(() => {
+    const saved = localStorage.getItem("codeforge_git_settings");
+    if (saved) {
+      try {
+        setGitSettings(JSON.parse(saved));
+      } catch (e) {
+        console.error("Failed to parse git settings");
+      }
+    }
+  }, []);
+
+  // 5. Git Logic with FS Shim
+  const handlePushToGithub = async () => {
+    if (!logic.instance) {
+      alert("WebContainer not ready yet.");
+      return;
+    }
+
+    // If settings are missing, open the modal instead of pushing
+    if (!gitSettings.token || !gitSettings.repoUrl) {
+      setIsGitModalOpen(true);
+      return;
+    }
+
+    setIsPushing(true);
+    try {
+      const dir = "/";
+      const wcFs = logic.instance.fs;
+
+      /**
+       * Mapping the WebContainer FS to the Node.js FS structure 
+       * expected by isomorphic-git.
+       */
+      const fsShim: any = {
+        promises: {
+          readFile: wcFs.readFile.bind(wcFs),
+          writeFile: wcFs.writeFile.bind(wcFs),
+          readdir: wcFs.readdir.bind(wcFs),
+          mkdir: wcFs.mkdir.bind(wcFs),
+          unlink: wcFs.rm.bind(wcFs),
+          rmdir: wcFs.rm.bind(wcFs),
+          stat: async (path: string) => {
+            const pathParts = path.split('/').filter(Boolean);
+            const name = pathParts.pop();
+            const parentDir = '/' + pathParts.join('/');
+            
+            try {
+              const entries = await wcFs.readdir(parentDir, { withFileTypes: true });
+              const entry = entries.find(e => e.name === name);
+              return {
+                type: entry?.isDirectory() ? 'dir' : 'file',
+                mode: entry?.isDirectory() ? 0o777 : 0o666,
+                size: 0,
+                ino: 0,
+                mtimeMs: Date.now(),
+                isDirectory: () => entry?.isDirectory() || false,
+                isFile: () => !entry?.isDirectory() || true,
+                isSymbolicLink: () => false,
+              };
+            } catch {
+              return { type: 'dir', mode: 0o777, size: 0, isDirectory: () => true, isFile: () => false };
+            }
+          },
+          lstat: async (path: string) => fsShim.promises.stat(path),
+        }
+      };
+
+      // Git Workflow: Init -> Add -> Commit -> Push
+      try { await git.init({ fs: fsShim, dir }); } catch (e) {}
+      
+      await git.add({ fs: fsShim, dir, filepath: "." });
+      
+      await git.commit({
+        fs: fsShim,
+        dir,
+        message: `Update from CodeForge IDE: ${new Date().toLocaleString()}`,
+        author: { name: "CodeForge User", email: "user@codeforge.dev" },
+      });
+
+      await git.push({
+        fs: fsShim,
+        http,
+        dir,
+        remote: "origin",
+        url: gitSettings.repoUrl,
+        onAuth: () => ({ username: gitSettings.token }),
+      });
+
+      alert("Successfully pushed to GitHub!");
+    } catch (err: any) {
+      console.error("Git Push Error:", err);
+      // If push fails due to auth, prompt the user to check settings
+      if (err.message.includes("401") || err.message.includes("auth")) {
+        alert("GitHub Authentication failed. Please check your token.");
+        setIsGitModalOpen(true);
+      } else {
+        alert(`Push failed: ${err.message}`);
+      }
+    } finally {
+      setIsPushing(false);
+    }
+  };
+
   // --- Render States ---
   if (error || logic.containerError) {
     return (
       <div className="flex flex-col items-center justify-center h-[calc(100vh-4rem)] p-4 text-red-500">
         <h2 className="text-xl font-semibold">Something went wrong</h2>
         <p>{error || logic.containerError}</p>
-        <Button
-          onClick={() => window.location.reload()}
-          variant="destructive"
-          className="mt-4"
-        >
+        <Button onClick={() => window.location.reload()} variant="destructive" className="mt-4">
           Try Again
         </Button>
       </div>
@@ -64,14 +174,8 @@ const MainPlaygroundPage: React.FC = () => {
     return (
       <div className="flex flex-col items-center justify-center h-[calc(100vh-4rem)] p-4">
         <div className="w-full max-w-md p-6 rounded-lg border shadow-sm">
-          <h2 className="text-xl font-semibold mb-6 text-center">
-            Loading Playground
-          </h2>
-          <LoadingStep
-            currentStep={2}
-            step={2}
-            label="Setting up environment"
-          />
+          <h2 className="text-xl font-semibold mb-6 text-center">Loading Playground</h2>
+          <LoadingStep currentStep={2} step={2} label="Setting up environment" />
         </div>
       </div>
     );
@@ -80,29 +184,19 @@ const MainPlaygroundPage: React.FC = () => {
   if (!templateData) {
     return (
       <div className="flex flex-col items-center justify-center h-[calc(100vh-4rem)] p-4">
-        <h2 className="text-xl font-semibold text-amber-600">
-          No template data available
-        </h2>
-        <Button
-          onClick={() => window.location.reload()}
-          variant="outline"
-          className="mt-4"
-        >
+        <h2 className="text-xl font-semibold text-amber-600">No template data available</h2>
+        <Button onClick={() => window.location.reload()} variant="outline" className="mt-4">
           Reload
         </Button>
       </div>
     );
   }
 
-  // Derived State
-  const activeFile = explorer.openFiles.find(
-    (f) => f.id === explorer.activeFileId
-  );
+  const activeFile = explorer.openFiles.find((f) => f.id === explorer.activeFileId);
   const hasUnsaved = explorer.openFiles.some((f) => f.hasUnsavedChanges);
 
   return (
     <TooltipProvider>
-      {/* 1. Sidebar: File Explorer */}
       <TemplateFileTree
         data={templateData}
         onFileSelect={explorer.openFile}
@@ -116,42 +210,33 @@ const MainPlaygroundPage: React.FC = () => {
         onRenameFolder={logic.actions.handleRenameFolder}
       />
 
-      <SidebarInset>
-        {/* 2. Header */}
-        <PlaygroundHeader
-          title={playgroundData?.name || "Code Playground"}
-          openFilesCount={explorer.openFiles.length}
-          hasUnsavedChanges={hasUnsaved}
-          canSave={!!activeFile && activeFile.hasUnsavedChanges}
-          // FIXED: Access handleSave via logic.actions
-          onSave={() => logic.actions.handleSave()}
-          onSaveAll={logic.actions.handleSaveAll}
-          onTogglePreview={() =>
-            logic.setIsPreviewVisible(!logic.isPreviewVisible)
-          }
-          isPreviewVisible={logic.isPreviewVisible}
-          onCloseAll={explorer.closeAllFiles}
-          aiProps={{
-            isEnabled: ai.isEnabled,
-            onToggle: ai.toggleEnabled,
-            isLoading: ai.isLoading,
-          }}
-        />
+      <SidebarInset className="min-w-0 overflow-hidden">
+       <PlaygroundHeader
+  title={playgroundData?.name || "Code Playground"}
+  openFilesCount={explorer.openFiles.length}
+  hasUnsavedChanges={hasUnsaved}
+  canSave={!!activeFile && activeFile.hasUnsavedChanges}
+  onSave={() => logic.actions.handleSave()}
+  onSaveAll={logic.actions.handleSaveAll}
+  onTogglePreview={() => logic.setIsPreviewVisible(!logic.isPreviewVisible)}
+  isPreviewVisible={logic.isPreviewVisible}
+  onCloseAll={explorer.closeAllFiles}
+  onPushToGithub={handlePushToGithub}
+  onOpenGitSettings={() => setIsGitModalOpen(true)} // <-- Pass the trigger here
+  isPushing={isPushing}
+  aiProps={{
+    isEnabled: ai.isEnabled,
+    onToggle: ai.toggleEnabled,
+    isLoading: ai.isLoading,
+  }}
+/>
 
-        <div className="h-[calc(100vh-4rem)] flex flex-col">
-          {/* 3. VS Code Style File Tabs Area */}
+        <div className="h-[calc(100vh-4rem)] flex flex-col min-w-0 overflow-hidden">
           {explorer.openFiles.length > 0 && (
-            // ✅ FIXED: Added min-w-0 and max-w-full here
             <div className="bg-[#18181B] border-b border-zinc-800 flex items-center w-full min-w-0 max-w-full h-9 overflow-hidden shrink-0">
-              <Tabs
-                value={explorer.activeFileId || ""}
-                onValueChange={explorer.setActiveFileId}
-                // ✅ FIXED: Added min-w-0 and max-w-full here as well
-                className="w-full h-full min-w-0 max-w-full"
-              >
+              <Tabs value={explorer.activeFileId || ""} onValueChange={explorer.setActiveFileId} className="w-full h-full min-w-0 max-w-full">
                 <TabsList className="h-full w-full justify-start bg-transparent p-0 border-none rounded-none flex flex-nowrap overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                   {explorer.openFiles.map((file) => (
-                    /* Right-Click Context Menu Wrapper */
                     <ContextMenu key={file.id}>
                       <ContextMenuTrigger asChild>
                         <TabsTrigger
@@ -163,53 +248,29 @@ const MainPlaygroundPage: React.FC = () => {
                             <span className="truncate text-[13px] font-sans tracking-wide mt-[1px]">
                               {file.filename}.{file.fileExtension}
                             </span>
-                            {file.hasUnsavedChanges && (
-                              <span className="h-2 w-2 rounded-full bg-white opacity-80 shrink-0 ml-1" />
-                            )}
+                            {file.hasUnsavedChanges && <span className="h-2 w-2 rounded-full bg-white opacity-80 shrink-0 ml-1" />}
                           </div>
-
                           <span
                             className="ml-2 h-5 w-5 rounded-md hover:bg-zinc-700 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-zinc-400 hover:text-white shrink-0"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              explorer.closeFile(file.id);
-                            }}
+                            onClick={(e) => { e.stopPropagation(); explorer.closeFile(file.id); }}
                           >
                             <X className="h-3.5 w-3.5" />
                           </span>
                         </TabsTrigger>
                       </ContextMenuTrigger>
-
                       <ContextMenuContent className="bg-[#1e1e1e] border-zinc-800 text-zinc-300 shadow-xl w-48 rounded-md">
-                        <ContextMenuItem
-                          onClick={() => explorer.closeFile(file.id)}
-                          className="text-xs cursor-pointer focus:bg-[#007acc] focus:text-white"
-                        >
-                          Close
-                        </ContextMenuItem>
-
+                        <ContextMenuItem onClick={() => explorer.closeFile(file.id)} className="text-xs cursor-pointer focus:bg-[#007acc] focus:text-white">Close</ContextMenuItem>
                         {explorer.openFiles.length > 1 && (
                           <>
                             <ContextMenuItem
                               onClick={() => {
-                                explorer.openFiles.forEach((f) => {
-                                  if (f.id !== file.id) {
-                                    explorer.closeFile(f.id);
-                                  }
-                                });
+                                explorer.openFiles.forEach((f) => { if (f.id !== file.id) explorer.closeFile(f.id); });
                                 explorer.setActiveFileId(file.id);
                               }}
                               className="text-xs cursor-pointer focus:bg-[#007acc] focus:text-white"
-                            >
-                              Close Others
-                            </ContextMenuItem>
+                            >Close Others</ContextMenuItem>
                             <ContextMenuSeparator className="bg-zinc-800" />
-                            <ContextMenuItem
-                              onClick={explorer.closeAllFiles}
-                              className="text-xs cursor-pointer text-red-400 focus:bg-red-500/20 focus:text-red-400"
-                            >
-                              Close All
-                            </ContextMenuItem>
+                            <ContextMenuItem onClick={explorer.closeAllFiles} className="text-xs cursor-pointer text-red-400 focus:bg-red-500/20 focus:text-red-400">Close All</ContextMenuItem>
                           </>
                         )}
                       </ContextMenuContent>
@@ -219,17 +280,11 @@ const MainPlaygroundPage: React.FC = () => {
               </Tabs>
             </div>
           )}
-          {/* 4. Main Workspace (Editor + Preview) */}
           <PlaygroundWorkspace
             activeFile={activeFile}
             isPreviewVisible={logic.isPreviewVisible}
-            onContentChange={(val) => {
-              if (explorer.activeFileId) {
-                explorer.updateFileContent(explorer.activeFileId, val || "");
-              }
-            }}
+            onContentChange={(val) => { if (explorer.activeFileId) explorer.updateFileContent(explorer.activeFileId, val || ""); }}
             ai={{
-              // FIXED: Convert 'null' to empty string to satisfy type 'string'
               suggestion: ai.suggestion || "",
               isLoading: ai.isLoading,
               position: ai.position || { line: 0, column: 0 },
@@ -249,7 +304,17 @@ const MainPlaygroundPage: React.FC = () => {
         </div>
       </SidebarInset>
 
-      {/* 5. Dialogs */}
+      {/* Git Settings Modal */}
+      <GithubSettingsModal 
+        isOpen={isGitModalOpen}
+        onClose={() => setIsGitModalOpen(false)}
+        initialSettings={gitSettings}
+        onSave={(settings) => {
+          setGitSettings(settings);
+          localStorage.setItem("codeforge_git_settings", JSON.stringify(settings));
+        }}
+      />
+
       <ConfirmationDialog
         isOpen={logic.dialog.isOpen}
         title={logic.dialog.title}

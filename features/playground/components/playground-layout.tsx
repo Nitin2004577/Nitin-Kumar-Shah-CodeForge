@@ -4,11 +4,17 @@ import { usePlayground } from "../context/playground-context"
 import { AlertCircle, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { LoadingStep } from "@/components/ui/loader"
-import { PlaygroundEditor } from "./playground-editor"
+// import { PlaygroundEditor } from "./playground-editor" // Uncomment when ready
 import { PlaygroundHeader } from "./playground-header"
+import { useFileExplorer } from "../hooks/useFileExplorer" // Adjust paths as needed
+import { useAISuggestions } from "../hooks/useAISuggestion"
 
 export function PlaygroundLayout() {
-  const { error, loadingStep, templateData, fetchPlaygroundData } = usePlayground()
+  const { error, loadingStep, templateData, playgroundData, fetchPlaygroundData } = usePlayground()
+  
+  // Pull the state needed for the Header
+  const explorer = useFileExplorer()
+  const ai = useAISuggestions()
 
   if (error) {
     return (
@@ -53,10 +59,36 @@ export function PlaygroundLayout() {
     )
   }
 
+  // Calculate derived state for the header
+  const hasUnsaved = explorer.openFiles.some((f) => f.hasUnsavedChanges);
+  const activeFile = explorer.openFiles.find((f) => f.id === explorer.activeFileId);
+
   return (
     <div className="h-screen flex flex-col">
-      <PlaygroundHeader />
-      {/* <PlaygroundEditor /> */}
+      {/* ✅ Pass all required props to the Header */}
+      <PlaygroundHeader 
+        title={playgroundData?.name || "Code Playground"}
+        openFilesCount={explorer.openFiles.length}
+        hasUnsavedChanges={hasUnsaved}
+        canSave={!!activeFile && activeFile.hasUnsavedChanges}
+        onSave={() => console.log("Save triggered")} // Replace with actual save logic
+        onSaveAll={() => console.log("Save All triggered")}
+        onTogglePreview={() => {}} // Connect to your layout state
+        isPreviewVisible={true}
+        onCloseAll={explorer.closeAllFiles}
+        onPushToGithub={() => {}} // Connect to your Git logic
+        onOpenGitSettings={() => {}} // Connect to your Git logic
+        aiProps={{
+          isEnabled: ai.isEnabled,
+          onToggle: ai.toggleEnabled,
+          isLoading: ai.isLoading,
+        }}
+      />
+      
+      {/* Main Content Area */}
+      <main className="flex-1 overflow-hidden">
+         {/* <PlaygroundEditor /> */}
+      </main>
     </div>
   )
 }
