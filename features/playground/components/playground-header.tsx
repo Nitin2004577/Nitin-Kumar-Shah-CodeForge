@@ -6,7 +6,8 @@ import {
   Bot, 
   X,
   Settings,
-  Code2
+  Code2,
+  Github,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
@@ -30,9 +31,12 @@ interface PlaygroundHeaderProps {
   onSaveAll: () => void;
   onTogglePreview: () => void;
   onCloseAll: () => void;
+  onPushToGithub?: () => void;
+  onOpenGitSettings?: () => void; // Added for the Settings Modal
   
   // State
   isPreviewVisible: boolean;
+  isPushing?: boolean;
   
   // AI Props Group
   aiProps: {
@@ -51,7 +55,10 @@ export const PlaygroundHeader: React.FC<PlaygroundHeaderProps> = ({
   onSaveAll,
   onTogglePreview,
   onCloseAll,
+  onPushToGithub,
+  onOpenGitSettings,
   isPreviewVisible,
+  isPushing = false,
   aiProps
 }) => {
   return (
@@ -67,7 +74,6 @@ export const PlaygroundHeader: React.FC<PlaygroundHeaderProps> = ({
           </div>
           <h1 className="text-[13px] font-medium text-zinc-200 tracking-wide">{title}</h1>
           
-          {/* Subtle VS Code style unsaved dot */}
           {hasUnsavedChanges && (
             <span className="flex h-2 w-2 rounded-full bg-blue-500 ml-1" title="Unsaved changes" />
           )}
@@ -77,7 +83,7 @@ export const PlaygroundHeader: React.FC<PlaygroundHeaderProps> = ({
       {/* RIGHT: Actions */}
       <div className="flex items-center gap-1">
         
-        {/* Preview Toggle Button */}
+        {/* Preview Toggle */}
         <Button
           variant="ghost"
           size="sm"
@@ -117,7 +123,24 @@ export const PlaygroundHeader: React.FC<PlaygroundHeaderProps> = ({
           <span className="hidden sm:inline">AI {aiProps.isEnabled ? "On" : "Off"}</span>
         </Button>
 
-        <div className="w-[1px] h-4 bg-zinc-700 mx-1.5" /> {/* Divider */}
+        <div className="w-[1px] h-4 bg-zinc-700 mx-1.5" />
+
+        {/* Push to GitHub Button */}
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={onPushToGithub}
+          disabled={isPushing}
+          className={`h-7 px-2.5 gap-2 text-xs rounded-sm transition-all ${
+            isPushing 
+              ? "text-blue-400 bg-blue-400/10" 
+              : "text-zinc-300 hover:text-white hover:bg-zinc-800"
+          }`}
+          title="Push changes to GitHub"
+        >
+          <Github className={`h-3.5 w-3.5 ${isPushing ? "animate-spin" : ""}`} />
+          <span className="hidden sm:inline">{isPushing ? "Pushing..." : "Push"}</span>
+        </Button>
 
         {/* Save Button */}
         <Button
@@ -135,14 +158,14 @@ export const PlaygroundHeader: React.FC<PlaygroundHeaderProps> = ({
           <span className="hidden sm:inline">Save</span>
         </Button>
 
-        {/* Settings / More Menu */}
+        {/* Settings Dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="h-7 w-7 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-sm ml-0.5">
               <Settings className="h-3.5 w-3.5" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="bg-[#1e1e1e] border-zinc-800 text-zinc-300 w-48 shadow-xl">
+          <DropdownMenuContent align="end" className="bg-[#1e1e1e] border-zinc-800 text-zinc-300 w-56 shadow-xl">
             <DropdownMenuLabel className="text-xs text-zinc-500 uppercase tracking-wider font-semibold">File Actions</DropdownMenuLabel>
             
             <DropdownMenuItem 
@@ -159,6 +182,25 @@ export const PlaygroundHeader: React.FC<PlaygroundHeaderProps> = ({
               className="text-xs focus:bg-[#007acc] focus:text-white cursor-pointer data-[disabled]:opacity-50"
             >
               <Save className="mr-2 h-3.5 w-3.5" /> Save All
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator className="bg-zinc-800" />
+            <DropdownMenuLabel className="text-xs text-zinc-500 uppercase tracking-wider font-semibold">Git Actions</DropdownMenuLabel>
+
+            <DropdownMenuItem 
+              onClick={onOpenGitSettings} 
+              className="text-xs focus:bg-[#007acc] focus:text-white cursor-pointer"
+            >
+              <Settings className="mr-2 h-3.5 w-3.5" /> GitHub Settings
+            </DropdownMenuItem>
+
+            <DropdownMenuItem 
+              onClick={onPushToGithub} 
+              disabled={isPushing}
+              className="text-xs focus:bg-[#007acc] focus:text-white cursor-pointer data-[disabled]:opacity-50"
+            >
+              <Github className={`mr-2 h-3.5 w-3.5 ${isPushing ? "animate-spin" : ""}`} /> 
+              {isPushing ? "Pushing..." : "Push to GitHub"}
             </DropdownMenuItem>
             
             <DropdownMenuSeparator className="bg-zinc-800" />
