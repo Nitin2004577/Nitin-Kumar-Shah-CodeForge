@@ -23,6 +23,14 @@ import { useFileExplorer } from "@/../features/playground/hooks/useFileExplorer"
 import { useAISuggestions } from "@/../features/playground/hooks/useAISuggestion";
 import { usePlaygroundLogic } from "@/../features/playground/hooks/usePlaygroundLogic";
 
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+  ContextMenuSeparator,
+} from "@/components/ui/context-menu";
+
 const MainPlaygroundPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
 
@@ -131,58 +139,86 @@ const MainPlaygroundPage: React.FC = () => {
         />
 
         <div className="h-[calc(100vh-4rem)] flex flex-col">
-          {/* 3. File Tabs Area */}
+          {/* 3. VS Code Style File Tabs Area */}
           {explorer.openFiles.length > 0 && (
-            <div className="border-b bg-muted/30 shrink-0">
+            // ✅ FIXED: Added min-w-0 and max-w-full here
+            <div className="bg-[#18181B] border-b border-zinc-800 flex items-center w-full min-w-0 max-w-full h-9 overflow-hidden shrink-0">
               <Tabs
                 value={explorer.activeFileId || ""}
                 onValueChange={explorer.setActiveFileId}
+                // ✅ FIXED: Added min-w-0 and max-w-full here as well
+                className="w-full h-full min-w-0 max-w-full"
               >
-                <div className="flex items-center justify-between px-4 py-2">
-                  <TabsList className="h-8 bg-transparent p-0 flex flex-nowrap overflow-x-auto no-scrollbar">
-                    {explorer.openFiles.map((file) => (
-                      <TabsTrigger
-                        key={file.id}
-                        value={file.id}
-                        className="relative h-8 px-3 data-[state=active]:bg-background data-[state=active]:shadow-sm group border-r border-transparent data-[state=active]:border-border/50 min-w-[100px]"
-                      >
-                        <div className="flex items-center gap-2 max-w-[200px]">
-                          <FileText className="h-3 w-3 shrink-0" />
-                          <span className="truncate">
-                            {file.filename}.{file.fileExtension}
-                          </span>
-                          {file.hasUnsavedChanges && (
-                            <span className="h-2 w-2 rounded-full bg-orange-500 shrink-0" />
-                          )}
+                <TabsList className="h-full w-full justify-start bg-transparent p-0 border-none rounded-none flex flex-nowrap overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                  {explorer.openFiles.map((file) => (
+                    /* Right-Click Context Menu Wrapper */
+                    <ContextMenu key={file.id}>
+                      <ContextMenuTrigger asChild>
+                        <TabsTrigger
+                          value={file.id}
+                          className="relative h-9 px-3 bg-[#18181B] text-zinc-400 data-[state=active]:bg-[#1E1E1E] data-[state=active]:text-white rounded-none border-r border-zinc-800 border-t-2 border-t-transparent data-[state=active]:border-t-[#007acc] shadow-none min-w-[120px] max-w-[220px] flex items-center justify-between group cursor-pointer transition-none shrink-0"
+                        >
+                          <div className="flex items-center gap-2 overflow-hidden">
+                            <FileText className="h-3.5 w-3.5 shrink-0 opacity-70" />
+                            <span className="truncate text-[13px] font-sans tracking-wide mt-[1px]">
+                              {file.filename}.{file.fileExtension}
+                            </span>
+                            {file.hasUnsavedChanges && (
+                              <span className="h-2 w-2 rounded-full bg-white opacity-80 shrink-0 ml-1" />
+                            )}
+                          </div>
+
                           <span
-                            className="ml-1 h-4 w-4 hover:bg-destructive hover:text-destructive-foreground rounded-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                            className="ml-2 h-5 w-5 rounded-md hover:bg-zinc-700 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-zinc-400 hover:text-white shrink-0"
                             onClick={(e) => {
                               e.stopPropagation();
                               explorer.closeFile(file.id);
                             }}
                           >
-                            <X className="h-3 w-3" />
+                            <X className="h-3.5 w-3.5" />
                           </span>
-                        </div>
-                      </TabsTrigger>
-                    ))}
-                  </TabsList>
+                        </TabsTrigger>
+                      </ContextMenuTrigger>
 
-                  {explorer.openFiles.length > 1 && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={explorer.closeAllFiles}
-                      className="h-6 px-2 text-xs ml-2 shrink-0"
-                    >
-                      Close All
-                    </Button>
-                  )}
-                </div>
+                      <ContextMenuContent className="bg-[#1e1e1e] border-zinc-800 text-zinc-300 shadow-xl w-48 rounded-md">
+                        <ContextMenuItem
+                          onClick={() => explorer.closeFile(file.id)}
+                          className="text-xs cursor-pointer focus:bg-[#007acc] focus:text-white"
+                        >
+                          Close
+                        </ContextMenuItem>
+
+                        {explorer.openFiles.length > 1 && (
+                          <>
+                            <ContextMenuItem
+                              onClick={() => {
+                                explorer.openFiles.forEach((f) => {
+                                  if (f.id !== file.id) {
+                                    explorer.closeFile(f.id);
+                                  }
+                                });
+                                explorer.setActiveFileId(file.id);
+                              }}
+                              className="text-xs cursor-pointer focus:bg-[#007acc] focus:text-white"
+                            >
+                              Close Others
+                            </ContextMenuItem>
+                            <ContextMenuSeparator className="bg-zinc-800" />
+                            <ContextMenuItem
+                              onClick={explorer.closeAllFiles}
+                              className="text-xs cursor-pointer text-red-400 focus:bg-red-500/20 focus:text-red-400"
+                            >
+                              Close All
+                            </ContextMenuItem>
+                          </>
+                        )}
+                      </ContextMenuContent>
+                    </ContextMenu>
+                  ))}
+                </TabsList>
               </Tabs>
             </div>
           )}
-
           {/* 4. Main Workspace (Editor + Preview) */}
           <PlaygroundWorkspace
             activeFile={activeFile}
