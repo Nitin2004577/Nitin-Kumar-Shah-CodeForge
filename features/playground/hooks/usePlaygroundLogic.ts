@@ -2,6 +2,10 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { WebContainer } from "@webcontainer/api";
 
+// Git Imports
+import git from "isomorphic-git";
+import http from "isomorphic-git/http/web";
+
 // Hooks
 import { useFileExplorer } from "./useFileExplorer";
 import { useWebContainer } from "@/../features/webcontianers/hooks/useWebContainer";
@@ -17,7 +21,12 @@ export const usePlaygroundLogic = (
 ) => {
   // --- 1. Local UI State ---
   const [isPreviewVisible, setIsPreviewVisible] = useState(true);
-  const [serverUrl, setServerUrl] = useState<string | null>(null); // Local state for URL
+  const [serverUrl, setServerUrl] = useState<string | null>(null);
+
+  // --- 1.1 Git State (NEW) ---
+  const [isPushing, setIsPushing] = useState(false);
+  const [isGitModalOpen, setIsGitModalOpen] = useState(false);
+  const [gitSettings, setGitSettings] = useState({ token: "", repoUrl: "" });
 
   const lastSyncedContent = useRef<Map<string, string>>(new Map());
   const [dialogState, setDialogState] = useState({
@@ -28,8 +37,19 @@ export const usePlaygroundLogic = (
     onCancel: () => {},
   });
 
+  // Load Git settings from LocalStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem("codeforge_git_settings");
+    if (saved) {
+      try {
+        setGitSettings(JSON.parse(saved));
+      } catch (e) {
+        console.error("Failed to parse git settings");
+      }
+    }
+  }, []);
+
   // --- 2. WebContainer Initialization ---
-  // FIXED: Removed 'serverUrl' from destructuring to avoid the TS error.
   const {
     isLoading: containerLoading,
     error: containerError,
@@ -49,20 +69,13 @@ export const usePlaygroundLogic = (
     [instance]
   );
 
-  // --- 2.5.1 Listener for Server URL (NEW) ---
-  // Since the hook doesn't return serverUrl, we listen for it manually.
+  // --- 2.5.1 Listener for Server URL ---
   useEffect(() => {
     if (!instance) return;
-
     const onServerReady = (port: number, url: string) => {
-      console.log("Server ready:", url);
       setServerUrl(url);
     };
-
     instance.on("server-ready", onServerReady);
-
-    // Cleanup isn't strictly necessary for WebContainer events as they are singletons,
-    // but good practice if the instance changes.
   }, [instance]);
 
   // --- 2.5.2 Manual Mount Effect ---
@@ -109,7 +122,92 @@ export const usePlaygroundLogic = (
     []
   );
 
-  // --- 5. File Operation Wrappers ---
+  // --- 5. Git Logic (NEW) ---
+  const handlePushToGithub = useCallback(async () => {
+    if (!instance) {
+      toast.error("Environment not ready");
+      return;
+    }
+
+    if (!gitSettings.token || !gitSettings.repoUrl) {
+      setIsGitModalOpen(true);
+      return;
+    }
+
+    setIsPushing(true);
+    const toastId = toast.loading("Pushing to GitHub...");
+
+    try {
+      const dir = "/";
+      const wcFs = instance.fs;
+
+      // The Shim to translate WebContainer FS to Node FS for isomorphic-git
+      const fsShim: any = {
+        promises: {
+          readFile: wcFs.readFile.bind(wcFs),
+          writeFile: wcFs.writeFile.bind(wcFs),
+          readdir: wcFs.readdir.bind(wcFs),
+          mkdir: wcFs.mkdir.bind(wcFs),
+          unlink: wcFs.rm.bind(wcFs),
+          rmdir: wcFs.rm.bind(wcFs),
+          stat: async (path: string) => {
+            const pathParts = path.split('/').filter(Boolean);
+            const name = pathParts.pop();
+            const parentDir = '/' + pathParts.join('/');
+            try {
+              const entries = await wcFs.readdir(parentDir, { withFileTypes: true });
+              const entry = entries.find(e => e.name === name);
+              return {
+                type: entry?.isDirectory() ? 'dir' : 'file',
+                mode: entry?.isDirectory() ? 0o777 : 0o666,
+                size: 0,
+                ino: 0,
+                mtimeMs: Date.now(),
+                isDirectory: () => entry?.isDirectory() || false,
+                isFile: () => !entry?.isDirectory() || true,
+                isSymbolicLink: () => false,
+              };
+            } catch {
+              return { type: 'dir', mode: 0o777, size: 0, isDirectory: () => true, isFile: () => false };
+            }
+          },
+          lstat: async (path: string) => fsShim.promises.stat(path),
+        }
+      };
+
+      try { await git.init({ fs: fsShim, dir }); } catch (e) {}
+      await git.add({ fs: fsShim, dir, filepath: "." });
+      await git.commit({
+        fs: fsShim,
+        dir,
+        message: `CodeForge Update: ${new Date().toLocaleString()}`,
+        author: { name: "CodeForge User", email: "user@codeforge.dev" },
+      });
+
+      await git.push({
+        fs: fsShim,
+        http,
+        dir,
+        remote: "origin",
+        url: gitSettings.repoUrl,
+        onAuth: () => ({ username: gitSettings.token }),
+      });
+
+      toast.success("Successfully pushed to GitHub!", { id: toastId });
+    } catch (err: any) {
+      console.error(err);
+      if (err.message.includes("401")) {
+        toast.error("GitHub Auth Failed", { id: toastId });
+        setIsGitModalOpen(true);
+      } else {
+        toast.error(`Push failed: ${err.message}`, { id: toastId });
+      }
+    } finally {
+      setIsPushing(false);
+    }
+  }, [instance, gitSettings]);
+
+  // --- 6. File Operation Wrappers ---
   const handleAddFile = useCallback(
     (newFile: TemplateFile, parentPath: string) => {
       return explorer.handleAddFile(
@@ -138,31 +236,15 @@ export const usePlaygroundLogic = (
   );
 
   const handleRenameFile = useCallback(
-    (
-      file: TemplateFile,
-      newName: string,
-      newExt: string,
-      parentPath: string
-    ) => {
-      return explorer.handleRenameFile(
-        file,
-        newName,
-        newExt,
-        parentPath,
-        saveTemplateData
-      );
+    (file: TemplateFile, newName: string, newExt: string, parentPath: string) => {
+      return explorer.handleRenameFile(file, newName, newExt, parentPath, saveTemplateData);
     },
     [explorer, saveTemplateData]
   );
 
   const handleRenameFolder = useCallback(
     (folder: TemplateFolder, newName: string, parentPath: string) => {
-      return explorer.handleRenameFolder(
-        folder,
-        newName,
-        parentPath,
-        saveTemplateData
-      );
+      return explorer.handleRenameFolder(folder, newName, parentPath, saveTemplateData);
     },
     [explorer, saveTemplateData]
   );
@@ -182,7 +264,6 @@ export const usePlaygroundLogic = (
     (folder: TemplateFolder, parentPath: string) => {
       requestConfirmation(
         "Delete Folder",
-        // FIXED: Using 'folder.folderName' based on your interface
         `Are you sure you want to delete ${folder.folderName} and all its contents?`,
         () => explorer.handleDeleteFolder(folder, parentPath, saveTemplateData)
       );
@@ -190,7 +271,7 @@ export const usePlaygroundLogic = (
     [explorer, saveTemplateData, requestConfirmation]
   );
 
-  // --- 6. Save Logic ---
+  // --- 7. Save Logic ---
   const handleSave = useCallback(
     async (fileId?: string) => {
       const targetFileId = fileId || explorer.activeFileId;
@@ -209,13 +290,11 @@ export const usePlaygroundLogic = (
         const updatedData = JSON.parse(JSON.stringify(latestData));
         const lastContent = lastSyncedContent.current.get(fileToSave.id);
 
-        // Sync to WebContainer
         if (lastContent !== fileToSave.content) {
           await writeFileSync(filePath, fileToSave.content);
           lastSyncedContent.current.set(fileToSave.id, fileToSave.content);
         }
 
-        // Save to DB
         const newData = await saveTemplateData(updatedData);
         if (newData) explorer.setTemplateData(newData);
 
@@ -227,9 +306,7 @@ export const usePlaygroundLogic = (
           )
         );
 
-        toast.success(
-          `Saved ${fileToSave.filename}.${fileToSave.fileExtension}`
-        );
+        toast.success(`Saved ${fileToSave.filename}.${fileToSave.fileExtension}`);
       } catch (err) {
         console.error(err);
         toast.error("Failed to save file");
@@ -253,7 +330,7 @@ export const usePlaygroundLogic = (
     }
   }, [explorer.openFiles, handleSave]);
 
-  // --- 7. Shortcuts ---
+  // --- 8. Shortcuts ---
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {
@@ -270,9 +347,17 @@ export const usePlaygroundLogic = (
     setIsPreviewVisible,
     containerLoading,
     containerError,
-    serverUrl, // Returning our local state URL
+    serverUrl,
     instance,
     writeFileSync,
+    
+    // Git State & Actions
+    isPushing,
+    isGitModalOpen,
+    setIsGitModalOpen,
+    gitSettings,
+    setGitSettings,
+    handlePushToGithub,
 
     dialog: {
       ...dialogState,
