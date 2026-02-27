@@ -2,7 +2,6 @@
 
 import { auth } from "../../../auth";
 import { db } from "@/lib/db";
-import { includes } from "zod";
 
 export const getUserById = async (id: string) => {
   try {
@@ -32,6 +31,10 @@ export const getAccountByUserId = async (userId: string) => {
 };
 
 export const currentUser = async () => {
-    const user = await auth();
-    return user?.user;
+    const session = await auth();
+    
+    // 🚨 DEBUG LOG: Let's see exactly what NextAuth is returning!
+    console.log("🚨 DEBUG - RAW SESSION FROM NEXTAUTH:", session);
+    
+    return session?.user;
 }
