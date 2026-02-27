@@ -5,11 +5,11 @@ import { db } from "@/lib/db"
 import { TemplateFolder } from "../../../src/libs/types/template-folder.types";
 import { revalidatePath } from "next/cache";
 
-
 // Toggle marked status for a problem
 export const toggleStarMarked = async (playgroundId: string, isChecked: boolean) => {
-    const user = await currentUser();
-    const userId = user?.id;
+  const user = await currentUser();
+  const userId = user?.id;
+    
   if (!userId) {
     throw new Error("User ID is required");
   }
@@ -18,7 +18,7 @@ export const toggleStarMarked = async (playgroundId: string, isChecked: boolean)
     if (isChecked) {
       await db.starMark.create({
         data: {
-          userId: userId!,
+          userId: userId,
           playgroundId,
           isMarked: isChecked,
         },
@@ -29,7 +29,6 @@ export const toggleStarMarked = async (playgroundId: string, isChecked: boolean)
           userId_playgroundId: {
             userId,
             playgroundId: playgroundId,
-
           },
         },
       });
@@ -51,36 +50,50 @@ export const createPlayground = async (data:{
     const {template , title , description} = data;
 
     const user = await currentUser();
+    
+    // Stop immediately if there's no user ID
+    if (!user || !user.id) {
+        throw new Error("Unauthorized: User ID is missing.");
+    }
+
     try {
         const playground = await db.playground.create({
             data:{
                 title:title,
                 description:description,
                 template:template,
-                userId:user?.id!
+                userId: user.id 
             }
         })
 
         return playground;
     } catch (error) {
-        console.log(error)
+        console.error("Error creating playground:", error)
+        throw error;
     }
 }
 
-
 export const getAllPlaygroundForUser = async ()=>{
     const user = await currentUser();
+    
+    // 🚨 DEBUG LOG: Let's see exactly what we are dealing with!
+    console.log("🚨 DEBUG - CURRENT USER RESULT IN ACTION:", user); 
+    
+    // Stop immediately if there's no user ID
+    if (!user || !user.id) {
+        throw new Error("Unauthorized: User ID is missing.");
+    }
+
     try {
-        const user  = await currentUser();
         const playground = await db.playground.findMany({
             where:{
-                userId:user?.id!
+                userId: user.id 
             },
             include:{
                 user:true,
                 Starmark:{
                     where:{
-                        userId:user?.id!
+                        userId: user.id 
                     },
                     select:{
                         isMarked:true
@@ -91,7 +104,8 @@ export const getAllPlaygroundForUser = async ()=>{
       
         return playground;
     } catch (error) {
-        console.log(error)
+        console.error("Error fetching playgrounds:", error)
+        throw error;
     }
 }
 
@@ -111,18 +125,18 @@ export const getPlaygroundById = async (id:string)=>{
         })
         return playground;
     } catch (error) {
-        console.log(error)
+        console.error("Error fetching playground by ID:", error)
     }
 }
 
 export const SaveUpdatedCode = async (playgroundId: string, data: TemplateFolder) => {
   const user = await currentUser();
-  if (!user) return null;
+  if (!user || !user.id) return null;
 
   try {
     const updatedPlayground = await db.templateFile.upsert({
       where: {
-        playgroundId, // now allowed since playgroundId is unique
+        playgroundId, 
       },
       update: {
         content: JSON.stringify(data),
@@ -135,7 +149,7 @@ export const SaveUpdatedCode = async (playgroundId: string, data: TemplateFolder
 
     return updatedPlayground;
   } catch (error) {
-    console.log("SaveUpdatedCode error:", error);
+    console.error("SaveUpdatedCode error:", error);
     return null;
   }
 };
@@ -147,10 +161,9 @@ export const deleteProjectById = async (id:string)=>{
         })
         revalidatePath("/dashboard")
     } catch (error) {
-        console.log(error)
+        console.error("Error deleting project:", error)
     }
 }
-
 
 export const editProjectById = async (id:string,data:{title:string , description:string})=>{
     try {
@@ -160,7 +173,7 @@ export const editProjectById = async (id:string,data:{title:string , description
         })
         revalidatePath("/dashboard")
     } catch (error) {
-        console.log(error)
+        console.error("Error editing project:", error)
     }
 }
 
@@ -170,7 +183,7 @@ export const duplicateProjectById = async (id: string) => {
         const originalPlayground = await db.playground.findUnique({
             where: { id },
             include: {
-                templateFiles: true, // Include related template files
+                templateFiles: true, 
             },
         });
 
