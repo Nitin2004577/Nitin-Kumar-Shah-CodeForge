@@ -8,19 +8,24 @@ export default {
     Google({
       clientId: process.env.GOOGLE_ID,
       clientSecret: process.env.GOOGLE_SECRET,
-      // PUT IT HERE INSTEAD
       allowDangerousEmailAccountLinking: true, 
       authorization: {
-        params: { prompt: "select_account" },
+        params: { 
+          prompt: "select_account",
+          access_type: "offline",
+          response_type: "code"
+        },
       },
     }),
     Github({
       clientId: process.env.GITHUB_ID,
       clientSecret: process.env.GITHUB_SECRET,
-      // AND HERE
       allowDangerousEmailAccountLinking: true, 
       authorization: {
-        params: { prompt: "login" },
+        params: { 
+          prompt: "login",
+          scope: "read:user user:email repo" 
+        },
       },
     }),
   ],
