@@ -1,7 +1,8 @@
 "use client";
 
-import React from "react";
-import { useParams } from "next/navigation";
+import React, { useState } from "react";
+// 🚨 FIX 1: Import useRouter
+import { useParams, useRouter } from "next/navigation"; 
 import { FileText, X } from "lucide-react";
 
 // UI Components
@@ -10,12 +11,14 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import LoadingStep from "@/components/ui/loader";
+import { toast } from "sonner";
 
 // Feature Components
 import { TemplateFileTree } from "@/../features/playground/components/playground-explorer";
 import { ConfirmationDialog } from "@/../features/playground/components/dialogs/conformation-dialog";
 import { PlaygroundHeader } from "@/../features/playground/components/playground-header";
 import { PlaygroundWorkspace } from "@/../features/playground/components/playground-workspace";
+import { GithubPushModal } from "@/../features/playground/components/GithubPushModal";
 
 // Hooks
 import { usePlayground } from "@/../features/playground/hooks/usePlayground";
@@ -25,29 +28,95 @@ import { usePlaygroundLogic } from "@/../features/playground/hooks/usePlayground
 
 const MainPlaygroundPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter(); // 🚨 FIX 2: Initialize router
 
-  // 1. Global Stores & Data
+  // --- 1. Global Stores & Data ---
   const { playgroundData, templateData, isLoading, error, saveTemplateData } =
     usePlayground(id);
   const explorer = useFileExplorer();
   const ai = useAISuggestions();
 
-  // 2. Local Controller Logic (The "Brain" Hook)
+  // --- 2. Local Controller Logic ---
   const logic = usePlaygroundLogic(id, templateData, saveTemplateData);
+
+  // --- 3. Git Specific State ---
+  const [isGitModalOpen, setIsGitModalOpen] = useState(false);
+  const [isPushing, setIsPushing] = useState(false);
+
+  // --- 4. Git Push Handler ---
+  const handleGitPush = async (repoFullName: string, commitMessage: string) => {
+    setIsPushing(true);
+    try {
+      const filesToPush: Record<string, string> = {};
+
+      if (templateData) {
+        const extractFiles = (nodes: any[], currentPath = "") => {
+          nodes.forEach((node) => {
+            const nodePath = currentPath ? `${currentPath}/${node.name}` : node.name;
+            
+            if (node.type === "file") {
+              const openFileRef = explorer.openFiles.find(f => f.id === node.id);
+              filesToPush[nodePath] = openFileRef ? openFileRef.content : (node.content || "");
+            } else if (node.type === "folder" && node.children) {
+              extractFiles(node.children, nodePath);
+            }
+          });
+        };
+        extractFiles(Array.isArray(templateData) ? templateData : [templateData]);
+      }
+
+      if (Object.keys(filesToPush).length === 0) {
+        toast.error("No files found in project to push!");
+        setIsPushing(false);
+        return;
+      }
+
+      const response = await fetch("/api/github/push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          repo: repoFullName,
+          message: commitMessage,
+          files: filesToPush, 
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) throw new Error(result.error || "Push failed");
+
+      toast.success("Successfully pushed to GitHub!");
+      setIsGitModalOpen(false);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to push to GitHub");
+    } finally {
+      setIsPushing(false);
+    }
+  };
 
   // --- Render States ---
   if (error || logic.containerError) {
     return (
       <div className="flex flex-col items-center justify-center h-[calc(100vh-4rem)] p-4 text-red-500">
-        <h2 className="text-xl font-semibold">Something went wrong</h2>
-        <p>{error || logic.containerError}</p>
-        <Button
-          onClick={() => window.location.reload()}
-          variant="destructive"
-          className="mt-4"
-        >
-          Try Again
-        </Button>
+        <h2 className="text-xl font-semibold">Playground Unavailable</h2>
+        <p className="mt-2 text-muted-foreground">{error || logic.containerError}</p>
+        
+        {/* 🚨 FIX 3: Added Go Home button for escape hatch */}
+        <div className="flex gap-4 mt-6">
+          <Button
+            onClick={() => router.push("/")} // Or change "/" to whatever your dashboard route is
+            variant="default"
+          >
+            Go Home
+          </Button>
+          <Button
+            onClick={() => window.location.reload()}
+            variant="outline"
+          >
+            Retry
+          </Button>
+        </div>
       </div>
     );
   }
@@ -94,7 +163,6 @@ const MainPlaygroundPage: React.FC = () => {
 
   return (
     <TooltipProvider>
-      {/* 1. Sidebar: File Explorer */}
       <TemplateFileTree
         data={templateData}
         onFileSelect={explorer.openFile}
@@ -109,13 +177,11 @@ const MainPlaygroundPage: React.FC = () => {
       />
 
       <SidebarInset>
-        {/* 2. Header */}
         <PlaygroundHeader
           title={playgroundData?.name || "Code Playground"}
           openFilesCount={explorer.openFiles.length}
           hasUnsavedChanges={hasUnsaved}
           canSave={!!activeFile && activeFile.hasUnsavedChanges}
-          // FIXED: Access handleSave via logic.actions
           onSave={() => logic.actions.handleSave()}
           onSaveAll={logic.actions.handleSaveAll}
           onTogglePreview={() =>
@@ -123,6 +189,10 @@ const MainPlaygroundPage: React.FC = () => {
           }
           isPreviewVisible={logic.isPreviewVisible}
           onCloseAll={explorer.closeAllFiles}
+          
+          onGitPush={() => setIsGitModalOpen(true)}
+          isPushing={isPushing}
+          
           aiProps={{
             isEnabled: ai.isEnabled,
             onToggle: ai.toggleEnabled,
@@ -131,7 +201,6 @@ const MainPlaygroundPage: React.FC = () => {
         />
 
         <div className="h-[calc(100vh-4rem)] flex flex-col">
-          {/* 3. File Tabs Area */}
           {explorer.openFiles.length > 0 && (
             <div className="border-b bg-muted/30 shrink-0">
               <Tabs
@@ -183,7 +252,6 @@ const MainPlaygroundPage: React.FC = () => {
             </div>
           )}
 
-          {/* 4. Main Workspace (Editor + Preview) */}
           <PlaygroundWorkspace
             activeFile={activeFile}
             isPreviewVisible={logic.isPreviewVisible}
@@ -193,7 +261,6 @@ const MainPlaygroundPage: React.FC = () => {
               }
             }}
             ai={{
-              // FIXED: Convert 'null' to empty string to satisfy type 'string'
               suggestion: ai.suggestion || "",
               isLoading: ai.isLoading,
               position: ai.position || { line: 0, column: 0 },
@@ -213,7 +280,6 @@ const MainPlaygroundPage: React.FC = () => {
         </div>
       </SidebarInset>
 
-      {/* 5. Dialogs */}
       <ConfirmationDialog
         isOpen={logic.dialog.isOpen}
         title={logic.dialog.title}
@@ -221,6 +287,12 @@ const MainPlaygroundPage: React.FC = () => {
         onConfirm={logic.dialog.onConfirm}
         onCancel={logic.dialog.onCancel}
         setIsOpen={logic.dialog.setIsOpen}
+      />
+
+      <GithubPushModal 
+        isOpen={isGitModalOpen}
+        onClose={() => setIsGitModalOpen(false)}
+        onPush={handleGitPush}
       />
     </TooltipProvider>
   );
