@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { getPlaygroundById, SaveUpdatedCode } from '@/../../features/playground/actions/index';
@@ -26,14 +25,19 @@ export const usePlayground = (id: string): UsePlaygroundReturn => {
   const [error, setError] = useState<string | null>(null);
 
   const loadPlayground = useCallback(async () => {
-    if (!id) return;
+    // 🚨 FIX 1: Catch undefined or invalid IDs immediately
+    if (!id || id === "undefined") {
+      setError("Playground not found. It may have been deleted.");
+      setIsLoading(false);
+      return;
+    }
 
     try {
       setIsLoading(true);
       setError(null);
 
       const data = await getPlaygroundById(id);
-    //   @ts-ignore
+      // @ts-ignore
       setPlaygroundData(data);
 
       const rawContent = data?.templateFiles?.[0]?.content;
@@ -46,6 +50,12 @@ export const usePlayground = (id: string): UsePlaygroundReturn => {
 
       // Load template from API if not in saved content
       const res = await fetch(`/api/template/${id}`);
+      
+      // 🚨 FIX 2: Explicitly catch 404s for deleted data
+      if (res.status === 404) {
+        throw new Error("Playground not found. It may have been deleted.");
+      }
+      
       if (!res.ok) throw new Error(`Failed to load template: ${res.status}`);
 
       const templateRes = await res.json();
@@ -62,10 +72,11 @@ export const usePlayground = (id: string): UsePlaygroundReturn => {
       }
 
       toast.success("Template loaded successfully");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error loading playground:", error);
-      setError("Failed to load playground data");
-      toast.error("Failed to load playground data");
+      setError(error.message || "Failed to load playground data");
+      // Optional: Remove the toast error here if you don't want it popping up when a project is deleted
+      toast.error(error.message || "Failed to load playground data"); 
     } finally {
       setIsLoading(false);
     }
