@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 // 🚨 FIX 1: Import useRouter
-import { useParams, useRouter } from "next/navigation"; 
+import { useParams, useRouter } from "next/navigation";
 import { FileText, X } from "lucide-react";
 
 // UI Components
@@ -43,27 +43,58 @@ const MainPlaygroundPage: React.FC = () => {
   const [isGitModalOpen, setIsGitModalOpen] = useState(false);
   const [isPushing, setIsPushing] = useState(false);
 
-  // --- 4. Git Push Handler ---
   const handleGitPush = async (repoFullName: string, commitMessage: string) => {
     setIsPushing(true);
     try {
       const filesToPush: Record<string, string> = {};
 
       if (templateData) {
-        const extractFiles = (nodes: any[], currentPath = "") => {
-          nodes.forEach((node) => {
-            const nodePath = currentPath ? `${currentPath}/${node.name}` : node.name;
-            
-            if (node.type === "file") {
-              const openFileRef = explorer.openFiles.find(f => f.id === node.id);
-              filesToPush[nodePath] = openFileRef ? openFileRef.content : (node.content || "");
-            } else if (node.type === "folder" && node.children) {
-              extractFiles(node.children, nodePath);
-            }
-          });
+        console.log("DEBUG: templateData structure:", templateData);
+
+        const extractFiles = (node: any, currentPath = "") => {
+          // 1. Determine the name and path
+          // Folders have 'folderName', Files have 'filename'
+          const nodeName =
+            node.folderName ||
+            (node.filename ? `${node.filename}.${node.fileExtension}` : "");
+
+          // Skip the very top root folder name so files land in the root of the GitHub repo
+          const isRoot = currentPath === "" && node.folderName;
+          const nodePath = isRoot
+            ? ""
+            : currentPath
+            ? `${currentPath}/${nodeName}`
+            : nodeName;
+
+          console.log(
+            `DEBUG: Processing: ${nodeName}, IsFile: ${!!node.filename}`
+          );
+
+          // 2. Check if it's a File (has filename)
+          if (node.filename) {
+            // Check if this file is open in the editor to get the latest unsaved code
+            const openFileRef = explorer.openFiles.find(
+              (f) =>
+                f.filename === node.filename &&
+                f.fileExtension === node.fileExtension
+            );
+
+            filesToPush[nodePath] = openFileRef
+              ? openFileRef.content || ""
+              : node.content || "";
+          }
+          // 3. Check if it's a Folder (has items)
+          else if (node.items && Array.isArray(node.items)) {
+            node.items.forEach((child: any) => {
+              extractFiles(child, nodePath);
+            });
+          }
         };
-        extractFiles(Array.isArray(templateData) ? templateData : [templateData]);
+
+        extractFiles(templateData);
       }
+
+      console.log("DEBUG: Final files object:", filesToPush);
 
       if (Object.keys(filesToPush).length === 0) {
         toast.error("No files found in project to push!");
@@ -77,31 +108,31 @@ const MainPlaygroundPage: React.FC = () => {
         body: JSON.stringify({
           repo: repoFullName,
           message: commitMessage,
-          files: filesToPush, 
+          files: filesToPush,
         }),
       });
 
       const result = await response.json();
-
       if (!response.ok) throw new Error(result.error || "Push failed");
 
       toast.success("Successfully pushed to GitHub!");
       setIsGitModalOpen(false);
     } catch (err: any) {
-      console.error(err);
+      console.error("PUSH_ERROR:", err);
       toast.error(err.message || "Failed to push to GitHub");
     } finally {
       setIsPushing(false);
     }
   };
-
   // --- Render States ---
   if (error || logic.containerError) {
     return (
       <div className="flex flex-col items-center justify-center h-[calc(100vh-4rem)] p-4 text-red-500">
         <h2 className="text-xl font-semibold">Playground Unavailable</h2>
-        <p className="mt-2 text-muted-foreground">{error || logic.containerError}</p>
-        
+        <p className="mt-2 text-muted-foreground">
+          {error || logic.containerError}
+        </p>
+
         {/* 🚨 FIX 3: Added Go Home button for escape hatch */}
         <div className="flex gap-4 mt-6">
           <Button
@@ -110,10 +141,7 @@ const MainPlaygroundPage: React.FC = () => {
           >
             Go Home
           </Button>
-          <Button
-            onClick={() => window.location.reload()}
-            variant="outline"
-          >
+          <Button onClick={() => window.location.reload()} variant="outline">
             Retry
           </Button>
         </div>
@@ -189,10 +217,8 @@ const MainPlaygroundPage: React.FC = () => {
           }
           isPreviewVisible={logic.isPreviewVisible}
           onCloseAll={explorer.closeAllFiles}
-          
           onGitPush={() => setIsGitModalOpen(true)}
           isPushing={isPushing}
-          
           aiProps={{
             isEnabled: ai.isEnabled,
             onToggle: ai.toggleEnabled,
@@ -289,7 +315,7 @@ const MainPlaygroundPage: React.FC = () => {
         setIsOpen={logic.dialog.setIsOpen}
       />
 
-      <GithubPushModal 
+      <GithubPushModal
         isOpen={isGitModalOpen}
         onClose={() => setIsGitModalOpen(false)}
         onPush={handleGitPush}
