@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { toast } from "sonner";
-import { WebContainer } from "@webcontainer/api";
+import { WebContainer, FileSystemTree } from "@webcontainer/api";
 
 // Hooks
 import { useFileExplorer } from "./useFileExplorer";
@@ -10,6 +10,34 @@ import { useWebContainer } from "@/../features/webcontianers/hooks/useWebContain
 import { findFilePath } from "../lib";
 import { TemplateFile, TemplateFolder } from "../types";
 
+// --- NEW HELPER FUNCTION ---
+// Helper to convert your DB structure (items array) to WebContainer structure
+const buildFileSystemTree = (folder: TemplateFolder): FileSystemTree => {
+  const tree: FileSystemTree = {};
+
+  if (folder.items && Array.isArray(folder.items)) {
+    folder.items.forEach((item) => {
+      // If the item has a 'folderName', it's a TemplateFolder
+      if ('folderName' in item) {
+        tree[item.folderName] = {
+          directory: buildFileSystemTree(item as TemplateFolder),
+        };
+      } 
+      // Otherwise, it's a TemplateFile
+      else if ('filename' in item) {
+        const fileItem = item as TemplateFile;
+        tree[`${fileItem.filename}.${fileItem.fileExtension}`] = {
+          file: {
+            contents: fileItem.content || "",
+          },
+        };
+      }
+    });
+  }
+
+  return tree;
+};
+
 export const usePlaygroundLogic = (
   id: string,
   templateData: any,
@@ -17,7 +45,7 @@ export const usePlaygroundLogic = (
 ) => {
   // --- 1. Local UI State ---
   const [isPreviewVisible, setIsPreviewVisible] = useState(true);
-  const [serverUrl, setServerUrl] = useState<string | null>(null); // Local state for URL
+  const [serverUrl, setServerUrl] = useState<string | null>(null);
 
   const lastSyncedContent = useRef<Map<string, string>>(new Map());
   const [dialogState, setDialogState] = useState({
@@ -29,7 +57,6 @@ export const usePlaygroundLogic = (
   });
 
   // --- 2. WebContainer Initialization ---
-  // FIXED: Removed 'serverUrl' from destructuring to avoid the TS error.
   const {
     isLoading: containerLoading,
     error: containerError,
@@ -49,8 +76,7 @@ export const usePlaygroundLogic = (
     [instance]
   );
 
-  // --- 2.5.1 Listener for Server URL (NEW) ---
-  // Since the hook doesn't return serverUrl, we listen for it manually.
+  // --- 2.5.1 Listener for Server URL ---
   useEffect(() => {
     if (!instance) return;
 
@@ -60,9 +86,6 @@ export const usePlaygroundLogic = (
     };
 
     instance.on("server-ready", onServerReady);
-
-    // Cleanup isn't strictly necessary for WebContainer events as they are singletons,
-    // but good practice if the instance changes.
   }, [instance]);
 
   // --- 2.5.2 Manual Mount Effect ---
@@ -70,7 +93,12 @@ export const usePlaygroundLogic = (
     const mountFiles = async () => {
       if (instance && templateData) {
         try {
-          await instance.mount(templateData);
+          // Convert the custom TemplateFolder into a FileSystemTree
+          const fileSystemTree = buildFileSystemTree(templateData as TemplateFolder);
+          
+          // Mount the correctly formatted tree
+          await instance.mount(fileSystemTree);
+          console.log("✅ Files successfully mounted to WebContainer!");
         } catch (e) {
           console.error("Failed to mount files", e);
         }
@@ -182,7 +210,6 @@ export const usePlaygroundLogic = (
     (folder: TemplateFolder, parentPath: string) => {
       requestConfirmation(
         "Delete Folder",
-        // FIXED: Using 'folder.folderName' based on your interface
         `Are you sure you want to delete ${folder.folderName} and all its contents?`,
         () => explorer.handleDeleteFolder(folder, parentPath, saveTemplateData)
       );
