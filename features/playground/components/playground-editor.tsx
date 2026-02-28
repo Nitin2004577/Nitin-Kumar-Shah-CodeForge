@@ -9,11 +9,12 @@ import {
 } from "@/../../features/playground/lib/editor-config";
 import type { TemplateFile } from "@/../../features/playground/lib/path-to-json";
 
-
 interface PlaygroundEditorProps {
   activeFile: TemplateFile | undefined;
   content: string;
   onContentChange: (value: string) => void;
+  // ✨ NEW: Added the onSave prop
+  onSave: (content: string) => void; 
   suggestion: string | null;
   suggestionLoading: boolean;
   suggestionPosition: { line: number; column: number } | null;
@@ -26,6 +27,7 @@ export const PlaygroundEditor = ({
   activeFile,
   content,
   onContentChange,
+  onSave, // ✨ NEW: Destructured here
   suggestion,
   suggestionLoading,
   suggestionPosition,
@@ -45,10 +47,10 @@ export const PlaygroundEditor = ({
 
   const activeFileRef = useRef(activeFile);
 
-// 2. Add this useEffect to keep the ref always updated with the LATEST file
-useEffect(() => {
-  activeFileRef.current = activeFile;
-}, [activeFile]);
+  // 2. Add this useEffect to keep the ref always updated with the LATEST file
+  useEffect(() => {
+    activeFileRef.current = activeFile;
+  }, [activeFile]);
 
   const suggestionAcceptedRef = useRef(false);
   const suggestionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -398,6 +400,13 @@ useEffect(() => {
       onTriggerSuggestion("completion", editor);
     });
 
+    // ✨ NEW: Add the Ctrl+S / Cmd+S Save Shortcut ✨
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+      console.log("💾 Save triggered via keyboard shortcut!");
+      // Call our new onSave prop and pass it the current text in the editor!
+      onSave(editor.getValue());
+    });
+
     // CRITICAL: Override Tab key with high priority and prevent default Monaco behavior
     if (tabCommandRef.current) {
       tabCommandRef.current.dispose();
@@ -573,32 +582,32 @@ useEffect(() => {
   }, [activeFile]);
 
   // Cleanup on unmount
- useEffect(() => {
-  return () => {
-    // 1. Clear timers
-    if (suggestionTimeoutRef.current) {
-      clearTimeout(suggestionTimeoutRef.current);
-    }
-    
-    // 2. Dispose AI Provider
-    inlineCompletionProviderRef.current?.dispose();
-    inlineCompletionProviderRef.current = null;
-    
-    // 3. Dispose Tab Command (SAFE CHECK)
-    // We check if it exists before logging/disposing
-   if (tabCommandRef.current && typeof tabCommandRef.current.dispose === 'function') {
+  useEffect(() => {
+    return () => {
+      // 1. Clear timers
+      if (suggestionTimeoutRef.current) {
+        clearTimeout(suggestionTimeoutRef.current);
+      }
+      
+      // 2. Dispose AI Provider
+      inlineCompletionProviderRef.current?.dispose();
+      inlineCompletionProviderRef.current = null;
+      
+      // 3. Dispose Tab Command (SAFE CHECK)
+      // We check if it exists before logging/disposing
+      if (tabCommandRef.current && typeof tabCommandRef.current.dispose === 'function') {
         tabCommandRef.current.dispose();
-    
-    // Clear the ref regardless
-    tabCommandRef.current = null;
-    } else {
+      
+        // Clear the ref regardless
+        tabCommandRef.current = null;
+      } else {
         console.log("Tab command was already null - nothing to dispose");
-    }
+      }
 
-    // 4. Log the file extension using the LIVE REF
-    console.log("File extension on close: ", activeFileRef.current?.fileExtension);
-  };
-}, []);
+      // 4. Log the file extension using the LIVE REF
+      console.log("File extension on close: ", activeFileRef.current?.fileExtension);
+    };
+  }, []);
 
   return (
     <div className="h-full relative">
@@ -632,8 +641,6 @@ useEffect(() => {
         // Cast the options to 'any' to resolve the 'lineNumbers' type mismatch
         options={defaultEditorOptions as any}
       />
-
-      
     </div>
   );
 };
