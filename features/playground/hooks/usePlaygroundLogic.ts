@@ -17,18 +17,25 @@ const buildFileSystemTree = (folder: TemplateFolder): FileSystemTree => {
 
   if (folder.items && Array.isArray(folder.items)) {
     folder.items.forEach((item) => {
-      // If the item has a 'folderName', it's a TemplateFolder
-      if ('folderName' in item) {
+      if ("folderName" in item) {
         tree[item.folderName] = {
           directory: buildFileSystemTree(item as TemplateFolder),
         };
-      } 
-      // Otherwise, it's a TemplateFile
-      else if ('filename' in item) {
+      } else if ("filename" in item) {
         const fileItem = item as TemplateFile;
-        tree[`${fileItem.filename}.${fileItem.fileExtension}`] = {
+        // Use the exact filename + extension
+        const fullFileName = `${fileItem.filename}.${fileItem.fileExtension}`;
+
+        // --- THE FIX ---
+        // Check if we have a saved version of THIS specific file
+        const savedContent = localStorage.getItem(
+          `file-storage-${fullFileName}`
+        );
+
+        tree[fullFileName] = {
           file: {
-            contents: fileItem.content || "",
+            // Prioritize local storage content over the default template content
+            contents: savedContent || fileItem.content || "",
           },
         };
       }
@@ -61,22 +68,10 @@ export const usePlaygroundLogic = (
     isLoading: containerLoading,
     error: containerError,
     instance,
+    writeFileSync, // <-- FIX 1: Extracted the "smart" function directly from your hook
   } = useWebContainer();
 
-  // Helper: Write File Wrapper
-  const writeFileSync = useCallback(
-    async (path: string, content: string) => {
-      if (!instance) return;
-      try {
-        await instance.fs.writeFile(path, content);
-      } catch (err) {
-        console.error("Failed to write to container:", err);
-      }
-    },
-    [instance]
-  );
-
-  // --- 2.5.1 Listener for Server URL ---
+  // --- 2.5.1 Listener for Server URL (FIXED CLEANUP) ---
   useEffect(() => {
     if (!instance) return;
 
@@ -86,21 +81,34 @@ export const usePlaygroundLogic = (
     };
 
     instance.on("server-ready", onServerReady);
+
+    // CLEANUP: Prevent duplicate listeners during Next.js Hot Reloads
+    return () => {
+      setServerUrl(null);
+    };
   }, [instance]);
 
   // --- 2.5.2 Manual Mount Effect ---
+  const hasMounted = useRef(false); // <-- FIX 2: Added a lock to prevent the flicker bug
+
   useEffect(() => {
     const mountFiles = async () => {
-      if (instance && templateData) {
+      // Check the lock! Only mount if we haven't done it yet.
+      if (instance && templateData && !hasMounted.current) {
+        hasMounted.current = true; // Lock it immediately!
+
         try {
           // Convert the custom TemplateFolder into a FileSystemTree
-          const fileSystemTree = buildFileSystemTree(templateData as TemplateFolder);
-          
+          const fileSystemTree = buildFileSystemTree(
+            templateData as TemplateFolder
+          );
+
           // Mount the correctly formatted tree
           await instance.mount(fileSystemTree);
-          console.log("✅ Files successfully mounted to WebContainer!");
+          console.log("✅ Files successfully mounted to WebContainer EXACTLY ONCE!");
         } catch (e) {
           console.error("Failed to mount files", e);
+          hasMounted.current = false; // Unlock if it failed so it can retry
         }
       }
     };
@@ -144,7 +152,7 @@ export const usePlaygroundLogic = (
         newFile,
         parentPath,
         async (path, content) => {
-          await writeFileSync(path, content);
+          if (writeFileSync) await writeFileSync(path, content);
         },
         undefined,
         saveTemplateData
@@ -238,7 +246,9 @@ export const usePlaygroundLogic = (
 
         // Sync to WebContainer
         if (lastContent !== fileToSave.content) {
-          await writeFileSync(filePath, fileToSave.content);
+          if (writeFileSync) {
+            await writeFileSync(filePath, fileToSave.content);
+          }
           lastSyncedContent.current.set(fileToSave.id, fileToSave.content);
         }
 
