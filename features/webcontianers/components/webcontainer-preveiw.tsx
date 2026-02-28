@@ -42,9 +42,7 @@ const WebContainerPreview: React.FC<WebContainerPreviewProps> = ({
     ready: false,
   });
   
-  // NEW: State to track if terminal is ready
   const [isTerminalReady, setIsTerminalReady] = useState(false);
-
   const [currentStep, setCurrentStep] = useState(0);
   const totalSteps = 4;
   const [setupError, setSetupError] = useState<string | null>(null);
@@ -52,17 +50,14 @@ const WebContainerPreview: React.FC<WebContainerPreviewProps> = ({
   const [isSetupInProgress, setIsSetupInProgress] = useState(false);
   
   const terminalRef = useRef<any>(null);
+  // Track the running server process so we can kill it later
+  const serverProcessRef = useRef<any>(null);
 
-  // 1. Wait for Terminal to mount before allowing setup to start
   useEffect(() => {
-    // Give the dynamic terminal 1.5 seconds to fully load into the DOM
-    const timer = setTimeout(() => {
-        setIsTerminalReady(true);
-    }, 1500);
+    const timer = setTimeout(() => setIsTerminalReady(true), 1500);
     return () => clearTimeout(timer);
   }, []);
 
-  // Reset setup state when forceResetup changes
   useEffect(() => {
     if (forceResetup) {
       setIsSetupComplete(false);
@@ -81,45 +76,101 @@ const WebContainerPreview: React.FC<WebContainerPreviewProps> = ({
 
   useEffect(() => {
     async function setupContainer() {
-      // 2. Add !isTerminalReady to the guard clause
       if (!instance || !isTerminalReady || isSetupComplete || isSetupInProgress) return;
+
+      const getStartCommand = async () => {
+        try {
+          const pkgStr = await instance.fs.readFile('package.json', 'utf8');
+          const pkg = JSON.parse(pkgStr);
+          if (pkg.scripts?.dev) return "dev";
+          if (pkg.scripts?.start) return "start";
+        } catch (e) {
+          console.warn("Could not parse package.json for scripts. Defaulting to 'start'.");
+        }
+        return "start"; 
+      };
+
+      // Helper to kill existing node processes before starting a new one
+      const killExistingServers = async () => {
+        try {
+          const killProcess = await instance.spawn("killall", ["node"]);
+          await killProcess.exit;
+        } catch (e) {
+          // Ignore if nothing is running
+        }
+      };
+
+      // ✨ NEW: Helper to clear corrupted Webpack/TS caches
+      const clearCache = async () => {
+        try {
+          const rmProcess = await instance.spawn("rm", ["-rf", "node_modules/.cache"]);
+          await rmProcess.exit;
+        } catch (e) {
+          // Ignore if folder doesn't exist
+        }
+      };
 
       try {
         setIsSetupInProgress(true);
         setSetupError(null);
         
-        // Check if files exist (reconnect logic)
+        let hasPackageJson = false;
+        let hasNodeModules = false;
+
         try {
-          const packageJsonExists = await instance.fs.readFile('package.json', 'utf8');
-          if (packageJsonExists) {
-            if (terminalRef.current?.writeToTerminal) {
-              terminalRef.current.writeToTerminal("🔄 Reconnecting to existing WebContainer session...\r\n");
-            }
-            
-            instance.on("server-ready", (port: number, url: string) => {
-              console.log(`Reconnected to server on port ${port} at ${url}`);
-              if (terminalRef.current?.writeToTerminal) {
-                terminalRef.current.writeToTerminal(`🌐 Reconnected to server at ${url}\r\n`);
-              }
-              setPreviewUrl(url);
-              setLoadingState((prev) => ({
-                ...prev,
-                starting: false,
-                ready: true,
-              }));
-              setIsSetupComplete(true);
-              setIsSetupInProgress(false);
-            });
-            
-            setCurrentStep(4);
-            setLoadingState((prev) => ({ ...prev, starting: true }));
-            return;
+          await instance.fs.readFile('package.json', 'utf8');
+          hasPackageJson = true;
+        } catch (e) {}
+
+        try {
+          await instance.fs.readdir('node_modules');
+          hasNodeModules = true;
+        } catch (e) {}
+
+        // --- RECONNECT LOGIC ---
+        if (hasPackageJson && hasNodeModules) {
+          if (terminalRef.current?.writeToTerminal) {
+            terminalRef.current.writeToTerminal("🔄 Existing setup found. Cleaning up old processes and cache...\r\n");
           }
-        } catch (e) {
-          // Proceed with normal setup
+          
+          await clearCache(); // Clear the TS/Webpack cache
+          await killExistingServers(); // Automatically fix port collisions
+          
+          setCurrentStep(4);
+          setLoadingState((prev) => ({ ...prev, starting: true }));
+
+          instance.on("server-ready", (port: number, url: string) => {
+            console.log(`Reconnected to server on port ${port} at ${url}`);
+            if (terminalRef.current?.writeToTerminal) {
+              terminalRef.current.writeToTerminal(`🌐 Server ready at ${url}\r\n`);
+            }
+            setPreviewUrl(url);
+            setLoadingState((prev) => ({ ...prev, starting: false, ready: true }));
+            setIsSetupComplete(true);
+            setIsSetupInProgress(false);
+          });
+          
+          const cmd = await getStartCommand();
+          // Pass cross-env CI=true to prevent interactive prompts from tools like CRA
+          const startProcess = await instance.spawn("npm", ["run", cmd], {
+            env: { CI: "true" }
+          });
+          serverProcessRef.current = startProcess; // Save reference to kill later
+          
+          startProcess.output.pipeTo(
+            new WritableStream({
+              write(data) {
+                if (terminalRef.current?.writeToTerminal) {
+                  terminalRef.current.writeToTerminal(data);
+                }
+              },
+            })
+          );
+
+          return; 
         }
         
-        // Step 1: Transform data
+        // --- Step 1: Transform data ---
         setLoadingState((prev) => ({ ...prev, transforming: true }));
         setCurrentStep(1);
         
@@ -130,14 +181,10 @@ const WebContainerPreview: React.FC<WebContainerPreviewProps> = ({
         // @ts-ignore
         const files = transformToWebContainerFormat(templateData);
 
-        setLoadingState((prev) => ({
-          ...prev,
-          transforming: false,
-          mounting: true,
-        }));
+        setLoadingState((prev) => ({ ...prev, transforming: false, mounting: true }));
         setCurrentStep(2);
 
-        // Step 2: Mount files
+        // --- Step 2: Mount files ---
         if (terminalRef.current?.writeToTerminal) {
           terminalRef.current.writeToTerminal("📁 Mounting files to WebContainer...\r\n");
         }
@@ -148,16 +195,12 @@ const WebContainerPreview: React.FC<WebContainerPreviewProps> = ({
           terminalRef.current.writeToTerminal("✅ Files mounted successfully\r\n");
         }
 
-        setLoadingState((prev) => ({
-          ...prev,
-          mounting: false,
-          installing: true,
-        }));
+        setLoadingState((prev) => ({ ...prev, mounting: false, installing: true }));
         setCurrentStep(3);
 
-        // Step 3: Install dependencies
+        // --- Step 3: Install dependencies ---
         if (terminalRef.current?.writeToTerminal) {
-          terminalRef.current.writeToTerminal("📦 Installing dependencies...\r\n");
+          terminalRef.current.writeToTerminal("📦 Installing dependencies (this may take a minute)...\r\n");
         }
         
         const installProcess = await instance.spawn("npm", ["install"]);
@@ -182,19 +225,22 @@ const WebContainerPreview: React.FC<WebContainerPreviewProps> = ({
           terminalRef.current.writeToTerminal("✅ Dependencies installed successfully\r\n");
         }
 
-        setLoadingState((prev) => ({
-          ...prev,
-          installing: false,
-          starting: true,
-        }));
+        setLoadingState((prev) => ({ ...prev, installing: false, starting: true }));
         setCurrentStep(4);
 
-        // Step 4: Start the server
+        // --- Step 4: Start the server ---
+        await clearCache(); // Clear the TS/Webpack cache
+        await killExistingServers(); // Make absolutely sure port is clear
+        
         if (terminalRef.current?.writeToTerminal) {
           terminalRef.current.writeToTerminal("🚀 Starting development server...\r\n");
         }
         
-        const startProcess = await instance.spawn("npm", ["run", "start"]);
+        const cmd = await getStartCommand();
+        const startProcess = await instance.spawn("npm", ["run", cmd], {
+            env: { CI: "true" }
+        }); 
+        serverProcessRef.current = startProcess; // Save reference to kill later
 
         instance.on("server-ready", (port: number, url: string) => {
           console.log(`Server ready on port ${port} at ${url}`);
@@ -202,11 +248,7 @@ const WebContainerPreview: React.FC<WebContainerPreviewProps> = ({
             terminalRef.current.writeToTerminal(`🌐 Server ready at ${url}\r\n`);
           }
           setPreviewUrl(url);
-          setLoadingState((prev) => ({
-            ...prev,
-            starting: false,
-            ready: true,
-          }));
+          setLoadingState((prev) => ({ ...prev, starting: false, ready: true }));
           setIsSetupComplete(true);
           setIsSetupInProgress(false);
         });
@@ -242,12 +284,15 @@ const WebContainerPreview: React.FC<WebContainerPreviewProps> = ({
     }
 
     setupContainer();
-    // 3. Add isTerminalReady to dependency array
   }, [instance, templateData, isSetupComplete, isSetupInProgress, isTerminalReady]);
 
-  // Cleanup
+  // Cleanup hook when component unmounts
   useEffect(() => {
-    return () => {};
+    return () => {
+      if (serverProcessRef.current) {
+        serverProcessRef.current.kill();
+      }
+    };
   }, []);
 
   if (isLoading) {
