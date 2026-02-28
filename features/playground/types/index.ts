@@ -1,4 +1,5 @@
 export interface TemplateFile {
+  id: string;
   filename: string;
   fileExtension: string;
   content: string;
