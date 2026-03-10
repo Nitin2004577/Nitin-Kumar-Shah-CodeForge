@@ -26,7 +26,6 @@ const buildFileSystemTree = (folder: TemplateFolder): FileSystemTree => {
         // Use the exact filename + extension
         const fullFileName = `${fileItem.filename}.${fileItem.fileExtension}`;
 
-        // --- THE FIX ---
         // Check if we have a saved version of THIS specific file
         const savedContent = localStorage.getItem(
           `file-storage-${fullFileName}`
@@ -68,10 +67,28 @@ export const usePlaygroundLogic = (
     isLoading: containerLoading,
     error: containerError,
     instance,
-    writeFileSync, // <-- FIX 1: Extracted the "smart" function directly from your hook
   } = useWebContainer();
 
-  // --- 2.5.1 Listener for Server URL (FIXED CLEANUP) ---
+  // --- Bulletproof Write Function ---
+  const writeFileSync = useCallback(
+    async (path: string, content: string) => {
+      if (!instance) {
+        console.warn("WebContainer instance not ready yet");
+        return;
+      }
+      try {
+        // WebContainers strictly require proper paths. This ensures it routes correctly.
+        const cleanPath = path.startsWith("/") ? path : `/${path}`;
+        await instance.fs.writeFile(cleanPath, content);
+        console.log(`📝 Live Sync: Successfully updated ${cleanPath} in WebContainer`);
+      } catch (err) {
+        console.error(`❌ Failed to sync ${path} to container:`, err);
+      }
+    },
+    [instance]
+  );
+
+  // --- 2.5.1 Listener for Server URL ---
   useEffect(() => {
     if (!instance) return;
 
@@ -89,7 +106,7 @@ export const usePlaygroundLogic = (
   }, [instance]);
 
   // --- 2.5.2 Manual Mount Effect ---
-  const hasMounted = useRef(false); // <-- FIX 2: Added a lock to prevent the flicker bug
+  const hasMounted = useRef(false);
 
   useEffect(() => {
     const mountFiles = async () => {
@@ -225,34 +242,58 @@ export const usePlaygroundLogic = (
     [explorer, saveTemplateData, requestConfirmation]
   );
 
-  // --- 6. Save Logic ---
+  // --- 6. Save Logic (DEBUG MODE) ---
   const handleSave = useCallback(
     async (fileId?: string) => {
+      console.log("🔍 DEBUG 1: Save function triggered!");
+      
       const targetFileId = fileId || explorer.activeFileId;
-      if (!targetFileId) return;
+      console.log("🔍 DEBUG 2: Target File ID is:", targetFileId);
+      if (!targetFileId) {
+        console.log("🛑 STOPPING: No active file ID found.");
+        return;
+      }
 
       const fileToSave = explorer.openFiles.find((f) => f.id === targetFileId);
-      if (!fileToSave) return;
+      console.log("🔍 DEBUG 3: File object found:", fileToSave?.filename);
+      if (!fileToSave) {
+        console.log("🛑 STOPPING: Could not find the file object in openFiles.");
+        return;
+      }
 
+      // Using getState() to get the absolute latest from Zustand
       const latestData = useFileExplorer.getState().templateData;
-      if (!latestData) return;
+      console.log("🔍 DEBUG 4: Latest template data exists:", !!latestData);
+      if (!latestData) {
+        console.log("🛑 STOPPING: No templateData found in the store.");
+        return;
+      }
 
       try {
         const filePath = findFilePath(fileToSave, latestData);
-        if (!filePath) throw new Error("File path not found");
+        console.log("🔍 DEBUG 5: Calculated File Path:", filePath);
+        
+        if (!filePath) {
+          console.error("🛑 STOPPING: findFilePath returned undefined/null.");
+          throw new Error("File path not found");
+        }
 
         const updatedData = JSON.parse(JSON.stringify(latestData));
         const lastContent = lastSyncedContent.current.get(fileToSave.id);
 
+        console.log("🔍 DEBUG 6: Content changed?", lastContent !== fileToSave.content);
+
         // Sync to WebContainer
         if (lastContent !== fileToSave.content) {
-          if (writeFileSync) {
-            await writeFileSync(filePath, fileToSave.content);
-          }
+          console.log("🔍 DEBUG 7: Attempting to write to WebContainer...");
+          await writeFileSync(filePath, fileToSave.content);
           lastSyncedContent.current.set(fileToSave.id, fileToSave.content);
+        } else {
+           console.log("⏩ SKIPPING WRITE: File content hasn't changed since last save.");
         }
 
         // Save to DB
+        console.log("🔍 DEBUG 8: Saving to database/state...");
         const newData = await saveTemplateData(updatedData);
         if (newData) explorer.setTemplateData(newData);
 
@@ -267,8 +308,9 @@ export const usePlaygroundLogic = (
         toast.success(
           `Saved ${fileToSave.filename}.${fileToSave.fileExtension}`
         );
+        console.log("✅ DEBUG 9: Save complete!");
       } catch (err) {
-        console.error(err);
+        console.error("❌ DEBUG ERROR: Failed during the save process:", err);
         toast.error("Failed to save file");
       }
     },

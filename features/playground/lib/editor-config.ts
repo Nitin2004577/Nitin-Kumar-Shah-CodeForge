@@ -222,44 +222,8 @@ export const configureMonaco = (monaco: Monaco) => {
   // Set the theme
   monaco.editor.setTheme("modern-dark");
   
-  // Configure additional editor settings
-  monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
-    noSemanticValidation: false,
-    noSyntaxValidation: false,
-  });
-  
-  monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
-    noSemanticValidation: false,
-    noSyntaxValidation: false,
-  });
-
-  // Set compiler options for better IntelliSense
-  monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
-    target: monaco.languages.typescript.ScriptTarget.Latest,
-    allowNonTsExtensions: true,
-    moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
-    module: monaco.languages.typescript.ModuleKind.CommonJS,
-    noEmit: true,
-    esModuleInterop: true,
-    jsx: monaco.languages.typescript.JsxEmit.React,
-    reactNamespace: "React",
-    allowJs: true,
-    typeRoots: ["node_modules/@types"],
-  });
-
-  monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
-    target: monaco.languages.typescript.ScriptTarget.Latest,
-    allowNonTsExtensions: true,
-    moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
-    module: monaco.languages.typescript.ModuleKind.CommonJS,
-    noEmit: true,
-    esModuleInterop: true,
-    allowSyntheticDefaultImports: true,
-    jsx: monaco.languages.typescript.JsxEmit.React,
-    reactNamespace: "React",
-    allowJs: true,
-    typeRoots: ["node_modules/@types"],
-  });
+  // 🛑 NOTE: I removed the setDiagnosticsOptions and setCompilerOptions from here!
+  // Those are now exclusively handled in PlaygroundEditor.tsx
 };
 
 export const defaultEditorOptions = {

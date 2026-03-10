@@ -11,6 +11,7 @@ export interface PlaygroundData {
 }
 
 export interface TemplateFolder {
+  id: string;
   folderName: string;
   items: (TemplateFile | TemplateFolder)[];
 }

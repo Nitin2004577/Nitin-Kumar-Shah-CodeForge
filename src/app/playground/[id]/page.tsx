@@ -52,13 +52,10 @@ const MainPlaygroundPage: React.FC = () => {
         console.log("DEBUG: templateData structure:", templateData);
 
         const extractFiles = (node: any, currentPath = "") => {
-          // 1. Determine the name and path
-          // Folders have 'folderName', Files have 'filename'
           const nodeName =
             node.folderName ||
             (node.filename ? `${node.filename}.${node.fileExtension}` : "");
 
-          // Skip the very top root folder name so files land in the root of the GitHub repo
           const isRoot = currentPath === "" && node.folderName;
           const nodePath = isRoot
             ? ""
@@ -66,13 +63,7 @@ const MainPlaygroundPage: React.FC = () => {
             ? `${currentPath}/${nodeName}`
             : nodeName;
 
-          console.log(
-            `DEBUG: Processing: ${nodeName}, IsFile: ${!!node.filename}`
-          );
-
-          // 2. Check if it's a File (has filename)
           if (node.filename) {
-            // Check if this file is open in the editor to get the latest unsaved code
             const openFileRef = explorer.openFiles.find(
               (f) =>
                 f.filename === node.filename &&
@@ -82,9 +73,7 @@ const MainPlaygroundPage: React.FC = () => {
             filesToPush[nodePath] = openFileRef
               ? openFileRef.content || ""
               : node.content || "";
-          }
-          // 3. Check if it's a Folder (has items)
-          else if (node.items && Array.isArray(node.items)) {
+          } else if (node.items && Array.isArray(node.items)) {
             node.items.forEach((child: any) => {
               extractFiles(child, nodePath);
             });
@@ -93,8 +82,6 @@ const MainPlaygroundPage: React.FC = () => {
 
         extractFiles(templateData);
       }
-
-      console.log("DEBUG: Final files object:", filesToPush);
 
       if (Object.keys(filesToPush).length === 0) {
         toast.error("No files found in project to push!");
@@ -124,6 +111,7 @@ const MainPlaygroundPage: React.FC = () => {
       setIsPushing(false);
     }
   };
+
   // --- Render States ---
   if (error || logic.containerError) {
     return (
@@ -132,13 +120,8 @@ const MainPlaygroundPage: React.FC = () => {
         <p className="mt-2 text-muted-foreground">
           {error || logic.containerError}
         </p>
-
-        {/* 🚨 FIX 3: Added Go Home button for escape hatch */}
         <div className="flex gap-4 mt-6">
-          <Button
-            onClick={() => router.push("/")} // Or change "/" to whatever your dashboard route is
-            variant="default"
-          >
+          <Button onClick={() => router.push("/")} variant="default">
             Go Home
           </Button>
           <Button onClick={() => window.location.reload()} variant="outline">
@@ -183,10 +166,46 @@ const MainPlaygroundPage: React.FC = () => {
     );
   }
 
-  // Derived State
-  const activeFile = explorer.openFiles.find(
+  // -----------------------------------------------------------------
+  // 🚨 BULLETPROOF OVERRIDE FIX: 
+  // Deep search templateData to guarantee we always have the true content
+  // -----------------------------------------------------------------
+  const findOriginalFile = (node: any, targetId: string): any => {
+    if (!node) return null;
+    if (Array.isArray(node)) {
+      for (const item of node) {
+        const found = findOriginalFile(item, targetId);
+        if (found) return found;
+      }
+      return null;
+    }
+    if (node.id === targetId) return node;
+    if (node.items && Array.isArray(node.items)) {
+      for (const child of node.items) {
+        const found = findOriginalFile(child, targetId);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+
+  const activeFileRaw = explorer.openFiles.find(
     (f) => f.id === explorer.activeFileId
   );
+  
+  const originalFileData = templateData && explorer.activeFileId 
+    ? findOriginalFile(templateData, explorer.activeFileId) 
+    : null;
+
+  // If the file is unmodified, forcefully use the original content from the tree
+  // This bypasses the bug in useFileExplorer where content gets lost/overwritten
+  const activeFile = activeFileRaw ? {
+    ...activeFileRaw,
+    content: activeFileRaw.hasUnsavedChanges 
+      ? activeFileRaw.content 
+      : (originalFileData?.content || activeFileRaw.content || "")
+  } : undefined;
+
   const hasUnsaved = explorer.openFiles.some((f) => f.hasUnsavedChanges);
 
   return (
@@ -282,8 +301,9 @@ const MainPlaygroundPage: React.FC = () => {
             activeFile={activeFile}
             isPreviewVisible={logic.isPreviewVisible}
             onContentChange={(val) => {
-              if (explorer.activeFileId) {
-                explorer.updateFileContent(explorer.activeFileId, val || "");
+              // 🚨 FIX: Prevent Monaco's ghost onChange from overwriting other files
+              if (activeFile?.id) {
+                explorer.updateFileContent(activeFile.id, val || "");
               }
             }}
             ai={{

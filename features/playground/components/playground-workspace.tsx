@@ -1,3 +1,4 @@
+"use client";
 import React, { useEffect, useRef } from "react";
 import { FileText } from "lucide-react";
 import {
@@ -40,35 +41,37 @@ export const PlaygroundWorkspace: React.FC<PlaygroundWorkspaceProps> = ({
   ai,
   preview,
 }) => {
-  // Use a ref to track which file is currently loaded in the editor
-  // This prevents the "Locked Editor" bug where typing is overwritten
   const lastLoadedFileId = useRef<string | null>(null);
 
   // --- PERSISTENCE LOGIC ---
   useEffect(() => {
     if (activeFile && activeFile.id !== lastLoadedFileId.current) {
-      const savedContent = localStorage.getItem(
-        `file-storage-${activeFile.filename}`
-      );
+      // FIX: Include the extension in the storage key to avoid collisions
+      const fullPath = `${activeFile.filename}.${activeFile.fileExtension}`;
+      const savedContent = localStorage.getItem(`file-storage-${fullPath}`);
       
-      // Only trigger onContentChange if we have saved data AND it's a new file switch
       if (savedContent && savedContent !== activeFile.content) {
         onContentChange(savedContent);
       }
       
-      // Mark this file as "loaded" so typing doesn't trigger this again
       lastLoadedFileId.current = activeFile.id;
     }
-  }, [activeFile?.id, activeFile?.filename, onContentChange]);
+  }, [activeFile?.id, activeFile?.filename, activeFile?.fileExtension, onContentChange]);
 
   const handleSave = async (newContent: string) => {
     if (!activeFile || !preview.writeFileSync) return;
 
     try {
-      // 1. Update the WebContainer (The hook handles src/ and localStorage)
-      await preview.writeFileSync(activeFile.filename, newContent);
+      // FIX: WebContainer MUST have the extension to bundle correctly
+      const fullPath = `${activeFile.filename}.${activeFile.fileExtension}`;
       
-      console.log(`🚀 Update triggered for: ${activeFile.filename}`);
+      // 1. Write to WebContainer
+      await preview.writeFileSync(fullPath, newContent);
+      
+      // 2. Persist to LocalStorage using the full path
+      localStorage.setItem(`file-storage-${fullPath}`, newContent);
+      
+      console.log(`🚀 Sync Successful: ${fullPath}`);
     } catch (err) {
       console.error("❌ Save failed:", err);
     }
@@ -80,9 +83,7 @@ export const PlaygroundWorkspace: React.FC<PlaygroundWorkspaceProps> = ({
         <FileText className="h-16 w-16 text-muted-foreground/30" />
         <div className="text-center">
           <p className="text-lg font-medium text-foreground">No files open</p>
-          <p className="text-sm text-muted-foreground">
-            Select a file to start
-          </p>
+          <p className="text-sm text-muted-foreground">Select a file to start</p>
         </div>
       </div>
     );
