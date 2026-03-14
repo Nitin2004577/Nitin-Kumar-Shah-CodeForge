@@ -15,7 +15,7 @@ import { toast } from "sonner";
 
 // Feature Components
 import { TemplateFileTree } from "@/../features/playground/components/playground-explorer";
-import { ConfirmationDialog } from "@/../features/playground/components/dialogs/conformation-dialog";
+import { ConfirmationDialog } from "../../../../features/playground/components/dialogs/confirmation-dialog";
 import { PlaygroundHeader } from "@/../features/playground/components/playground-header";
 import { PlaygroundWorkspace } from "@/../features/playground/components/playground-workspace";
 import { GithubPushModal } from "@/../features/playground/components/GithubPushModal";

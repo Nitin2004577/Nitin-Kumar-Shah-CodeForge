@@ -106,8 +106,8 @@ export const PlaygroundEditor = ({
       jsx: monaco.languages.typescript.JsxEmit.ReactJSX,
       reactNamespace: "React",
       allowJs: true,
-      strict: false, // <--- THE FIX
-      noImplicitAny: false, // <--- THE FIX
+      strict: false,
+      noImplicitAny: false,
       skipLibCheck: true,
     };
 
@@ -154,12 +154,14 @@ export const PlaygroundEditor = ({
 
   useEffect(() => {
     return () => {
+      // 🚨 FIX: We leave the dependency array empty so this ONLY runs when the whole editor is unmounted
+      // preventing Monaco from thrashing its memory and CPU every time you click a new file!
       if (monacoRef.current) {
         const models = monacoRef.current.editor.getModels();
         models.forEach((model: any) => model.dispose());
       }
     };
-  }, [activeFile?.id]);
+  }, []); // <--- THIS IS THE FIX
 
   return (
     <div className="h-full relative">
