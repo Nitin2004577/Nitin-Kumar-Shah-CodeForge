@@ -8,12 +8,15 @@ export default {
     Google({
       clientId: process.env.GOOGLE_ID,
       clientSecret: process.env.GOOGLE_SECRET,
-      allowDangerousEmailAccountLinking: true, 
+      allowDangerousEmailAccountLinking: false, 
       authorization: {
         params: { 
-          prompt: "select_account",
+          prompt: "consent select_account",
           access_type: "offline",
-          response_type: "code"
+          response_type: "code",
+          // 1. openid, profile, email are required for basic login
+          // 2. Add your specific Google API scopes after that separated by spaces
+          // scope: "openid profile email https://www.googleapis.com/auth/drive.readonly" 
         },
       },
     }),
