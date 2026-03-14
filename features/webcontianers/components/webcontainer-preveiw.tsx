@@ -181,12 +181,23 @@ const WebContainerPreview: React.FC<WebContainerPreviewProps> = ({
         // @ts-ignore
         const files = transformToWebContainerFormat(templateData);
 
+        // 🚨 THE 3GB MEMORY SAVER 🚨
+        // Brutally strip out any massive auto-generated folders that might have 
+        // sneaked into your template data from GitHub or your database.
+        const heavyFolders = ['node_modules', '.next', 'dist', 'build', '.git', '.cache'];
+        heavyFolders.forEach(folder => {
+          if (files[folder]) {
+            console.warn(`🧹 Memory Saver: Removed heavy ${folder} from initial mount.`);
+            delete files[folder];
+          }
+        });
+
         setLoadingState((prev) => ({ ...prev, transforming: false, mounting: true }));
         setCurrentStep(2);
 
         // --- Step 2: Mount files ---
         if (terminalRef.current?.writeToTerminal) {
-          terminalRef.current.writeToTerminal("📁 Mounting files to WebContainer...\r\n");
+          terminalRef.current.writeToTerminal("📁 Mounting lightweight files to WebContainer...\r\n");
         }
         
         await instance.mount(files);
