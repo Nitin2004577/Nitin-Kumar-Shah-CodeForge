@@ -10,6 +10,7 @@ import {
   duplicateProjectById,
 } from "../../../../features/playground/actions";
 import { currentUser } from "../../../../features/auth/actions";
+import { auth } from "@/../auth"; // Keeping your existing imports
 
 const EmptyState = () => (
   <div className="flex flex-col items-center justify-center py-16">
@@ -26,12 +27,21 @@ const EmptyState = () => (
 );
 
 const DashboardMainPage = async () => {
-  const playgrounds = await getAllPlaygroundForUser();
-  console.log(playgrounds);
-
+  // 1. Get the current logged-in user FIRST
   const userData = await currentUser();
   console.log("Current User:", userData);
+
+  // 2. Fetch the playgrounds
+  const allPlaygrounds = await getAllPlaygroundForUser();
   
+  // 3. SECURITY FIX: Filter the projects to ONLY match the logged-in user
+  // (Assuming your project object has a userId property. If it's named differently, change 'userId' below!)
+  const userPlaygrounds = allPlaygrounds?.filter(
+    (project: any) => project.userId === userData?.id
+  ) || [];
+
+  console.log("Filtered Playgrounds for this user:", userPlaygrounds);
+
   return (
     <div className="flex flex-col justify-start items-center min-h-screen mx-auto max-w-7xl px-4 py-10">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
@@ -39,13 +49,14 @@ const DashboardMainPage = async () => {
         <AddRepo />
       </div>
       <div className="mt-10 flex flex-col justify-center items-center w-full">
-        {playgrounds && playgrounds.length === 0 ? (
+        {/* Check our newly filtered array instead of the raw database dump */}
+        {userPlaygrounds.length === 0 ? (
           <EmptyState />
         ) : (
           // @ts-ignore
           <ProjectTable
-            // Cast the data to any to ignore structural mismatches
-            projects={playgrounds as any}
+            // Pass the filtered array down to the table
+            projects={userPlaygrounds as any}
             onDeleteProject={deleteProjectById as any}
             onUpdateProject={editProjectById as any}
             onDuplicateProject={duplicateProjectById as any}
