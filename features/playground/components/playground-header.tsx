@@ -1,14 +1,15 @@
+"use client";
+
 import React from "react";
 import { useRouter } from "next/navigation";
-import { 
-  Save, 
-  PanelRightOpen, 
+import {
+  Save,
+  PanelRightOpen,
   PanelRightClose,
-  Bot, 
   X,
   Settings,
   Github,
-  ArrowLeft // Added ArrowLeft
+  ArrowLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
@@ -19,13 +20,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
-  DropdownMenuLabel
+  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+
+import ToggleAI from "../components/toggle-ai";
+import { AISettingsDropdown } from "../components/ai-setting-dropdown";
 
 interface PlaygroundHeaderProps {
   title: string;
@@ -39,10 +43,20 @@ interface PlaygroundHeaderProps {
   onGitPush?: () => void;
   isPushing?: boolean;
   isPreviewVisible: boolean;
+
+  // UPDATED: Added all the props needed for your new AI components
   aiProps: {
     isEnabled: boolean;
-    onToggle: () => void;
+    onToggle: (value: boolean) => void;
     isLoading: boolean;
+    isCodeCompletionAllFilesEnabled: boolean;
+    onToggleCodeCompletionAllFiles: (enabled: boolean) => void;
+    isCodeCompletionTSXEnabled: boolean;
+    onToggleCodeCompletionTSX: (enabled: boolean) => void;
+    isNextEditSuggestionsEnabled: boolean;
+    onToggleNextEditSuggestions: (enabled: boolean) => void;
+    onTriggerAISuggestion: (type: string, mode: "overlay" | "inline") => void;
+    activeFile: any;
   };
 }
 
@@ -58,7 +72,7 @@ export const PlaygroundHeader: React.FC<PlaygroundHeaderProps> = ({
   onGitPush,
   isPushing,
   isPreviewVisible,
-  aiProps
+  aiProps,
 }) => {
   const router = useRouter();
 
@@ -66,13 +80,14 @@ export const PlaygroundHeader: React.FC<PlaygroundHeaderProps> = ({
     <header className="h-14 border-b flex items-center px-4 justify-between bg-background shrink-0">
       {/* LEFT: Back Button, Sidebar Trigger & Title */}
       <div className="flex items-center gap-2">
+        {/* ... Keep your existing left side code exactly as it was ... */}
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
               variant="ghost"
               size="icon"
               className="h-8 w-8 text-muted-foreground hover:text-foreground"
-              onClick={() => router.push("/dashboard")} // Ensure this path is correct
+              onClick={() => router.push("/dashboard")}
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
@@ -81,11 +96,12 @@ export const PlaygroundHeader: React.FC<PlaygroundHeaderProps> = ({
         </Tooltip>
 
         <SidebarTrigger className="mr-2" />
-        
         <h1 className="text-lg font-semibold">{title}</h1>
-        
         {hasUnsavedChanges && (
-          <Badge variant="secondary" className="ml-2 text-xs bg-orange-100 text-orange-700 hover:bg-orange-200">
+          <Badge
+            variant="secondary"
+            className="ml-2 text-xs bg-orange-100 text-orange-700 hover:bg-orange-200"
+          >
             Unsaved
           </Badge>
         )}
@@ -93,16 +109,33 @@ export const PlaygroundHeader: React.FC<PlaygroundHeaderProps> = ({
 
       {/* RIGHT: Actions */}
       <div className="flex items-center gap-2">
-        {/* AI Toggle */}
-        <Button
-          variant={aiProps.isEnabled ? "secondary" : "ghost"}
-          size="sm"
-          onClick={aiProps.onToggle}
-          className={`h-8 gap-2 ${aiProps.isEnabled ? "text-purple-600 bg-purple-50 hover:bg-purple-100" : "text-muted-foreground"}`}
-        >
-          <Bot className={`h-4 w-4 ${aiProps.isLoading ? "animate-pulse" : ""}`} />
-          <span className="hidden sm:inline">AI {aiProps.isEnabled ? "On" : "Off"}</span>
-        </Button>
+        {/* --- NEW: Your Custom AI Components --- */}
+        <ToggleAI
+          isEnabled={aiProps.isEnabled}
+          onToggle={aiProps.onToggle}
+          suggestionLoading={aiProps.isLoading}
+          activeFeature={aiProps.isLoading ? "Generating..." : undefined}
+          loadingProgress={aiProps.isLoading ? 65 : 0}
+        />
+
+        <AISettingsDropdown
+          isAISuggestionsEnabled={aiProps.isEnabled}
+          onToggleAISuggestions={aiProps.onToggle}
+          isCodeCompletionAllFilesEnabled={
+            aiProps.isCodeCompletionAllFilesEnabled
+          }
+          onToggleCodeCompletionAllFiles={
+            aiProps.onToggleCodeCompletionAllFiles
+          }
+          isCodeCompletionTSXEnabled={aiProps.isCodeCompletionTSXEnabled}
+          onToggleCodeCompletionTSX={aiProps.onToggleCodeCompletionTSX}
+          isNextEditSuggestionsEnabled={aiProps.isNextEditSuggestionsEnabled}
+          onToggleNextEditSuggestions={aiProps.onToggleNextEditSuggestions}
+          onTriggerAISuggestion={aiProps.onTriggerAISuggestion}
+          suggestionLoading={aiProps.isLoading}
+          activeFile={aiProps.activeFile}
+        />
+        {/* -------------------------------------- */}
 
         {/* Git Push Button */}
         {onGitPush && (
@@ -113,8 +146,12 @@ export const PlaygroundHeader: React.FC<PlaygroundHeaderProps> = ({
             disabled={isPushing}
             className="h-8 gap-2 bg-slate-900 text-white hover:bg-slate-800 hover:text-white dark:bg-slate-50 dark:text-slate-900"
           >
-            <Github className={`h-4 w-4 ${isPushing ? "animate-bounce" : ""}`} />
-            <span className="hidden sm:inline">{isPushing ? "Pushing..." : "Commit & Push"}</span>
+            <Github
+              className={`h-4 w-4 ${isPushing ? "animate-bounce" : ""}`}
+            />
+            <span className="hidden sm:inline">
+              {isPushing ? "Pushing..." : "Commit & Push"}
+            </span>
           </Button>
         )}
 
@@ -140,12 +177,16 @@ export const PlaygroundHeader: React.FC<PlaygroundHeaderProps> = ({
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>View Options</DropdownMenuLabel>
             <DropdownMenuItem onClick={onTogglePreview}>
-              {isPreviewVisible ? <PanelRightClose className="mr-2 h-4 w-4"/> : <PanelRightOpen className="mr-2 h-4 w-4"/>}
+              {isPreviewVisible ? (
+                <PanelRightClose className="mr-2 h-4 w-4" />
+              ) : (
+                <PanelRightOpen className="mr-2 h-4 w-4" />
+              )}
               {isPreviewVisible ? "Hide Preview" : "Show Preview"}
             </DropdownMenuItem>
-            
+
             <DropdownMenuSeparator />
-            
+
             <DropdownMenuLabel>File Actions</DropdownMenuLabel>
             <DropdownMenuItem onClick={onSave} disabled={!canSave}>
               <Save className="mr-2 h-4 w-4" /> Save File
@@ -153,7 +194,11 @@ export const PlaygroundHeader: React.FC<PlaygroundHeaderProps> = ({
             <DropdownMenuItem onClick={onSaveAll} disabled={!hasUnsavedChanges}>
               <Save className="mr-2 h-4 w-4" /> Save All
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={onCloseAll} disabled={openFilesCount === 0} className="text-destructive">
+            <DropdownMenuItem
+              onClick={onCloseAll}
+              disabled={openFilesCount === 0}
+              className="text-destructive"
+            >
               <X className="mr-2 h-4 w-4" /> Close All
             </DropdownMenuItem>
           </DropdownMenuContent>
