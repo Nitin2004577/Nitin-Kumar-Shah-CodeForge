@@ -25,6 +25,7 @@ import {
   Sparkles,
   Loader2,
 } from "lucide-react";
+import { Bot } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface AISettingsDropdownProps {
@@ -68,17 +69,16 @@ export const AISettingsDropdown: React.FC<AISettingsDropdownProps> = ({
               <Button
                 size={"icon"}
                 variant={"outline"}
-                className="relative h-8 w-8" // Adjusted size for better fit
+                className="relative h-8 w-8"
                 onClick={() => onToggleAISuggestions(!isAISuggestionsEnabled)}
               >
-                {/* Using a placeholder SVG for the logo */}
-                <img
-                  src="/placeholder.svg?height=20&width=20"
-                  alt={isAISuggestionsEnabled ? "AI Enabled" : "AI Disabled"}
+                <Bot
                   className={cn("w-5 h-5", {
-                    "grayscale opacity-50": !isAISuggestionsEnabled,
+                    "text-muted-foreground opacity-50": !isAISuggestionsEnabled,
+                    "text-blue-500": isAISuggestionsEnabled, // Optional: give it a color when active!
                   })}
                 />
+
                 {!isAISuggestionsEnabled && (
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="w-4 h-0.5 bg-red-500 rotate-45 rounded-full"></div>

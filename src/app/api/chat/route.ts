@@ -22,7 +22,7 @@ export async function POST(req: Request) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "llama3", // Or "deepseek-coder", "mistral", etc.
+        model: "qwen2.5-coder:1.5b", // Or "deepseek-coder", "mistral", etc.
         messages: ollamaMessages,
         stream: false, // Set to false for a simpler JSON response
       }),

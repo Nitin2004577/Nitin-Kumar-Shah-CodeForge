@@ -44,7 +44,7 @@ interface PlaygroundHeaderProps {
   isPushing?: boolean;
   isPreviewVisible: boolean;
 
-  // UPDATED: Added all the props needed for your new AI components
+  // UPDATED: Added all the props needed for the new AI components
   aiProps: {
     isEnabled: boolean;
     onToggle: (value: boolean) => void;
@@ -80,7 +80,7 @@ export const PlaygroundHeader: React.FC<PlaygroundHeaderProps> = ({
     <header className="h-14 border-b flex items-center px-4 justify-between bg-background shrink-0">
       {/* LEFT: Back Button, Sidebar Trigger & Title */}
       <div className="flex items-center gap-2">
-        {/* ... Keep your existing left side code exactly as it was ... */}
+        {/* ... Keep the existing left side code exactly as it was ... */}
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -109,7 +109,7 @@ export const PlaygroundHeader: React.FC<PlaygroundHeaderProps> = ({
 
       {/* RIGHT: Actions */}
       <div className="flex items-center gap-2">
-        {/* --- NEW: Your Custom AI Components --- */}
+        {/* --- NEW: The Custom AI Components --- */}
         <ToggleAI
           isEnabled={aiProps.isEnabled}
           onToggle={aiProps.onToggle}
