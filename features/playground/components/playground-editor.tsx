@@ -95,7 +95,7 @@ export const PlaygroundEditor = ({
       );
     }
 
-    // ✨ 2. DISABLE STRICT MODE (Fixes the implicit 'any' error on 'todo')
+    // ✨ 2. DISABLE STRICT MODE (Monaco's "strict" mode is more of a headache than a help in a dynamic playground environment like this  where users are rapidly prototyping and may not have perfect types. Disabling it prevents a flood of non-actionable errors and lets the editor be more forgiving, similar to how a real IDE would behave with JavaScript files.)
     const compilerOptions = {
       target: monaco.languages.typescript.ScriptTarget.Latest,
       allowNonTsExtensions: true,

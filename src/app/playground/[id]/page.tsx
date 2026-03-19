@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 // 🚨 FIX 1: Import useRouter
 import { useParams, useRouter } from "next/navigation";
-import { FileText, X } from "lucide-react";
+import { FileText, X, TerminalSquare, GripHorizontal } from "lucide-react";
+import dynamic from "next/dynamic";
 
 // UI Components
 import { SidebarInset } from "@/components/ui/sidebar";
@@ -26,9 +27,23 @@ import { useFileExplorer } from "@/../features/playground/hooks/useFileExplorer"
 import { useAISuggestions } from "@/../features/playground/hooks/useAISuggestion";
 import { usePlaygroundLogic } from "@/../features/playground/hooks/usePlaygroundLogic";
 
+// Dynamically import the Terminal
+const TerminalComponent = dynamic(
+  () => import("@/../features/webcontianers/components/terminal"),
+  { ssr: false }
+);
+
 const MainPlaygroundPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const router = useRouter(); // 🚨 FIX 2: Initialize router
+
+  const terminalRef = useRef<any>(null);
+
+  // ✨ NEW: Terminal Resizing & Visibility State ✨
+  const [isTerminalVisible, setIsTerminalVisible] = useState(true);
+  const [terminalHeight, setTerminalHeight] = useState(256); // Default h-64 is 256px
+  const [isDragging, setIsDragging] = useState(false);
+  const dragRef = useRef(false); // Ref for immediate access in event listeners
 
   // --- 1. Global Stores & Data ---
   const { playgroundData, templateData, isLoading, error, saveTemplateData } =
@@ -42,6 +57,43 @@ const MainPlaygroundPage: React.FC = () => {
   // --- 3. Git Specific State ---
   const [isGitModalOpen, setIsGitModalOpen] = useState(false);
   const [isPushing, setIsPushing] = useState(false);
+
+  // ✨ NEW: Resizer Mouse Event Handlers ✨
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+    dragRef.current = true;
+  }, []);
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!dragRef.current) return;
+    const newHeight = window.innerHeight - e.clientY;
+    
+    // Constrain height between 100px (min) and 80% of screen (max)
+    if (newHeight > 100 && newHeight < window.innerHeight * 0.8) {
+      setTerminalHeight(newHeight);
+    }
+  }, []);
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+    dragRef.current = false;
+  }, []);
+
+  // Attach mouse listeners to the window so it doesn't stutter if you drag fast
+  useEffect(() => {
+    if (isDragging) {
+      window.addEventListener("mousemove", handleMouseMove);
+      window.addEventListener("mouseup", handleMouseUp);
+    } else {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    }
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isDragging, handleMouseMove, handleMouseUp]);
 
   const handleGitPush = async (repoFullName: string, commitMessage: string) => {
     setIsPushing(true);
@@ -167,7 +219,6 @@ const MainPlaygroundPage: React.FC = () => {
   }
 
   // -----------------------------------------------------------------
-  // 🚨 BULLETPROOF OVERRIDE FIX: 
   // Deep search templateData to guarantee we always have the true content
   // -----------------------------------------------------------------
   const findOriginalFile = (node: any, targetId: string): any => {
@@ -198,7 +249,6 @@ const MainPlaygroundPage: React.FC = () => {
     : null;
 
   // If the file is unmodified, forcefully use the original content from the tree
-  // This bypasses the bug in useFileExplorer where content gets lost/overwritten
   const activeFile = activeFileRaw ? {
     ...activeFileRaw,
     content: activeFileRaw.hasUnsavedChanges 
@@ -245,15 +295,24 @@ const MainPlaygroundPage: React.FC = () => {
           }}
         />
 
+        {/* 🚨 This prevents iframes from eating mouse events during a drag! */}
+        {isDragging && (
+          <div className="fixed inset-0 z-50 cursor-row-resize" />
+        )}
+
         <div className="h-[calc(100vh-4rem)] flex flex-col">
-          {explorer.openFiles.length > 0 && (
-            <div className="border-b bg-muted/30 shrink-0">
+          {/* ✨ FIX 1: TABS AREA - Added min-w-0 to the tabs side to prevent squishing the buttons ✨ */}
+          <div className="border-b bg-muted/30 shrink-0 flex items-center justify-between gap-2 pr-2">
+            
+            {/* The actual Tabs block - strictly constrained to available space */}
+            <div className="flex-1 min-w-0">
               <Tabs
                 value={explorer.activeFileId || ""}
                 onValueChange={explorer.setActiveFileId}
+                className="w-full"
               >
-                <div className="flex items-center justify-between px-4 py-2">
-                  <TabsList className="h-8 bg-transparent p-0 flex flex-nowrap overflow-x-auto no-scrollbar">
+                <div className="flex items-center px-4 py-2">
+                  <TabsList className="h-8 bg-transparent p-0 flex flex-nowrap overflow-x-auto no-scrollbar justify-start w-full">
                     {explorer.openFiles.map((file) => (
                       <TabsTrigger
                         key={file.id}
@@ -281,48 +340,95 @@ const MainPlaygroundPage: React.FC = () => {
                       </TabsTrigger>
                     ))}
                   </TabsList>
-
-                  {explorer.openFiles.length > 1 && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={explorer.closeAllFiles}
-                      className="h-6 px-2 text-xs ml-2 shrink-0"
-                    >
-                      Close All
-                    </Button>
-                  )}
                 </div>
               </Tabs>
             </div>
+
+            {/* ✨ Fixed Action Buttons (Will never be pushed off screen now!) ✨ */}
+            <div className="flex items-center gap-2 shrink-0 py-2">
+              <Button 
+                size="sm" 
+                variant={isTerminalVisible ? "secondary" : "default"} 
+                onClick={() => setIsTerminalVisible(!isTerminalVisible)} 
+                className="h-6 px-2 text-xs shrink-0"
+              >
+                <TerminalSquare className="w-3 h-3 mr-1.5" />
+                {isTerminalVisible ? 'Hide Terminal' : 'Terminal'}
+              </Button>
+
+              {explorer.openFiles.length > 1 && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={explorer.closeAllFiles}
+                  className="h-6 px-2 text-xs shrink-0"
+                >
+                  Close All
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* WORKSPACE AREA */}
+          <div className="flex-1 min-h-0 flex flex-col">
+            <PlaygroundWorkspace
+              activeFile={activeFile}
+              isPreviewVisible={logic.isPreviewVisible}
+              onContentChange={(val) => {
+                if (activeFile?.id) {
+                  explorer.updateFileContent(activeFile.id, val || "");
+                }
+              }}
+              ai={{
+                suggestion: ai.suggestion || "",
+                isLoading: ai.isLoading,
+                position: ai.position || { line: 0, column: 0 },
+                onAccept: ai.acceptSuggestion,
+                onReject: ai.rejectSuggestion,
+                onTrigger: ai.fetchSuggestion,
+              }}
+              preview={{
+                templateData: templateData!,
+                instance: logic.instance,
+                serverUrl: logic.serverUrl || "",
+                isLoading: logic.containerLoading,
+                error: logic.containerError,
+                writeFileSync: logic.writeFileSync,
+                terminalRef: terminalRef,
+              }}
+            />
+          </div>
+
+          {/* DRAGGABLE RESIZER HANDLE */}
+          {isTerminalVisible && (
+            <div
+              onMouseDown={handleMouseDown}
+              className="h-1.5 bg-border hover:bg-blue-500/50 cursor-row-resize shrink-0 flex items-center justify-center transition-colors group z-10"
+            >
+              <div className="w-12 h-1 rounded-full bg-transparent group-hover:bg-blue-500/80 transition-colors flex items-center justify-center">
+                <GripHorizontal className="w-4 h-4 text-blue-100 opacity-0 group-hover:opacity-100" />
+              </div>
+            </div>
           )}
 
-          <PlaygroundWorkspace
-            activeFile={activeFile}
-            isPreviewVisible={logic.isPreviewVisible}
-            onContentChange={(val) => {
-              // 🚨 FIX: Prevent Monaco's ghost onChange from overwriting other files
-              if (activeFile?.id) {
-                explorer.updateFileContent(activeFile.id, val || "");
-              }
-            }}
-            ai={{
-              suggestion: ai.suggestion || "",
-              isLoading: ai.isLoading,
-              position: ai.position || { line: 0, column: 0 },
-              onAccept: ai.acceptSuggestion,
-              onReject: ai.rejectSuggestion,
-              onTrigger: ai.fetchSuggestion,
-            }}
-            preview={{
-              templateData: templateData!,
-              instance: logic.instance,
-              serverUrl: logic.serverUrl || "",
-              isLoading: logic.containerLoading,
-              error: logic.containerError,
-              writeFileSync: logic.writeFileSync,
-            }}
-          />
+          {/* TERMINAL CONTAINER */}
+          {isTerminalVisible && (
+            <div 
+              style={{ height: `${terminalHeight}px` }}
+              className="border-t border-border shrink-0 bg-[#1e1e1e] flex flex-col"
+            >
+              {/* ✨ FIX 2: Removed the redundant custom header. Only the internal TerminalComponent will show now! */}
+              <div className="flex-1 min-h-0">
+                <TerminalComponent 
+                  ref={terminalRef}
+                  webContainerInstance={logic.instance}
+                  theme="dark"
+                  className="h-full w-full"
+                  onClose={() => setIsTerminalVisible(false)} // ✨ Passed onClose just in case your internal terminal component supports it!
+                />
+              </div>
+            </div>
+          )}
         </div>
       </SidebarInset>
 

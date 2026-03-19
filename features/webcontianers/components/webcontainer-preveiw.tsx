@@ -1,18 +1,11 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
-import dynamic from "next/dynamic";
 import type { TemplateFolder } from "@/../../features/playground/lib/path-to-json";
 import { transformToWebContainerFormat } from "../hooks/transformer";
 import { CheckCircle, Loader2, XCircle } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { WebContainer } from "@webcontainer/api";
-
-// Dynamic import to prevent SSR issues with xterm.js
-const TerminalComponent = dynamic(() => import("./terminal"), { 
-  ssr: false,
-  loading: () => <div className="h-full w-full bg-[#1e1e1e]" />
-});
 
 interface WebContainerPreviewProps {
   templateData: TemplateFolder;
@@ -22,6 +15,8 @@ interface WebContainerPreviewProps {
   instance: WebContainer | null;
   writeFileSync: (path: string, content: string) => Promise<void>;
   forceResetup?: boolean;
+  // ✨ NEW: We accept the terminal ref from the parent layout!
+  terminalRef?: React.MutableRefObject<any>; 
 }
 
 const WebContainerPreview: React.FC<WebContainerPreviewProps> = ({
@@ -32,6 +27,7 @@ const WebContainerPreview: React.FC<WebContainerPreviewProps> = ({
   serverUrl,
   writeFileSync,
   forceResetup = false,
+  terminalRef,
 }) => {
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const [loadingState, setLoadingState] = useState({
@@ -49,7 +45,6 @@ const WebContainerPreview: React.FC<WebContainerPreviewProps> = ({
   const [isSetupComplete, setIsSetupComplete] = useState(false);
   const [isSetupInProgress, setIsSetupInProgress] = useState(false);
   
-  const terminalRef = useRef<any>(null);
   // Track the running server process so we can kill it later
   const serverProcessRef = useRef<any>(null);
 
@@ -90,24 +85,18 @@ const WebContainerPreview: React.FC<WebContainerPreviewProps> = ({
         return "start"; 
       };
 
-      // Helper to kill existing node processes before starting a new one
       const killExistingServers = async () => {
         try {
           const killProcess = await instance.spawn("killall", ["node"]);
           await killProcess.exit;
-        } catch (e) {
-          // Ignore if nothing is running
-        }
+        } catch (e) {}
       };
 
-      // ✨ NEW: Helper to clear corrupted Webpack/TS caches
       const clearCache = async () => {
         try {
           const rmProcess = await instance.spawn("rm", ["-rf", "node_modules/.cache"]);
           await rmProcess.exit;
-        } catch (e) {
-          // Ignore if folder doesn't exist
-        }
+        } catch (e) {}
       };
 
       try {
@@ -127,21 +116,20 @@ const WebContainerPreview: React.FC<WebContainerPreviewProps> = ({
           hasNodeModules = true;
         } catch (e) {}
 
-        // --- RECONNECT LOGIC ---
         if (hasPackageJson && hasNodeModules) {
-          if (terminalRef.current?.writeToTerminal) {
+          if (terminalRef?.current?.writeToTerminal) {
             terminalRef.current.writeToTerminal("🔄 Existing setup found. Cleaning up old processes and cache...\r\n");
           }
           
-          await clearCache(); // Clear the TS/Webpack cache
-          await killExistingServers(); // Automatically fix port collisions
+          await clearCache();
+          await killExistingServers();
           
           setCurrentStep(4);
           setLoadingState((prev) => ({ ...prev, starting: true }));
 
           instance.on("server-ready", (port: number, url: string) => {
             console.log(`Reconnected to server on port ${port} at ${url}`);
-            if (terminalRef.current?.writeToTerminal) {
+            if (terminalRef?.current?.writeToTerminal) {
               terminalRef.current.writeToTerminal(`🌐 Server ready at ${url}\r\n`);
             }
             setPreviewUrl(url);
@@ -151,39 +139,31 @@ const WebContainerPreview: React.FC<WebContainerPreviewProps> = ({
           });
           
           const cmd = await getStartCommand();
-          // Pass cross-env CI=true to prevent interactive prompts from tools like CRA
-          const startProcess = await instance.spawn("npm", ["run", cmd], {
-            env: { CI: "true" }
-          });
-          serverProcessRef.current = startProcess; // Save reference to kill later
+          const startProcess = await instance.spawn("npm", ["run", cmd], { env: { CI: "true" } });
+          serverProcessRef.current = startProcess;
           
           startProcess.output.pipeTo(
             new WritableStream({
               write(data) {
-                if (terminalRef.current?.writeToTerminal) {
+                if (terminalRef?.current?.writeToTerminal) {
                   terminalRef.current.writeToTerminal(data);
                 }
               },
             })
           );
-
           return; 
         }
         
-        // --- Step 1: Transform data ---
         setLoadingState((prev) => ({ ...prev, transforming: true }));
         setCurrentStep(1);
         
-        if (terminalRef.current?.writeToTerminal) {
+        if (terminalRef?.current?.writeToTerminal) {
           terminalRef.current.writeToTerminal("🔄 Transforming template data...\r\n");
         }
 
         // @ts-ignore
         const files = transformToWebContainerFormat(templateData);
 
-        // 🚨 THE 3GB MEMORY SAVER 🚨
-        // Brutally strip out any massive auto-generated folders that might have 
-        // sneaked into your template data from GitHub or your database.
         const heavyFolders = ['node_modules', '.next', 'dist', 'build', '.git', '.cache'];
         heavyFolders.forEach(folder => {
           if (files[folder]) {
@@ -195,22 +175,20 @@ const WebContainerPreview: React.FC<WebContainerPreviewProps> = ({
         setLoadingState((prev) => ({ ...prev, transforming: false, mounting: true }));
         setCurrentStep(2);
 
-        // --- Step 2: Mount files ---
-        if (terminalRef.current?.writeToTerminal) {
+        if (terminalRef?.current?.writeToTerminal) {
           terminalRef.current.writeToTerminal("📁 Mounting lightweight files to WebContainer...\r\n");
         }
         
         await instance.mount(files);
         
-        if (terminalRef.current?.writeToTerminal) {
+        if (terminalRef?.current?.writeToTerminal) {
           terminalRef.current.writeToTerminal("✅ Files mounted successfully\r\n");
         }
 
         setLoadingState((prev) => ({ ...prev, mounting: false, installing: true }));
         setCurrentStep(3);
 
-        // --- Step 3: Install dependencies ---
-        if (terminalRef.current?.writeToTerminal) {
+        if (terminalRef?.current?.writeToTerminal) {
           terminalRef.current.writeToTerminal("📦 Installing dependencies (this may take a minute)...\r\n");
         }
         
@@ -219,7 +197,7 @@ const WebContainerPreview: React.FC<WebContainerPreviewProps> = ({
         installProcess.output.pipeTo(
           new WritableStream({
             write(data) {
-              if (terminalRef.current?.writeToTerminal) {
+              if (terminalRef?.current?.writeToTerminal) {
                 terminalRef.current.writeToTerminal(data);
               }
             },
@@ -232,30 +210,27 @@ const WebContainerPreview: React.FC<WebContainerPreviewProps> = ({
           throw new Error(`Failed to install dependencies. Exit code: ${installExitCode}`);
         }
 
-        if (terminalRef.current?.writeToTerminal) {
+        if (terminalRef?.current?.writeToTerminal) {
           terminalRef.current.writeToTerminal("✅ Dependencies installed successfully\r\n");
         }
 
         setLoadingState((prev) => ({ ...prev, installing: false, starting: true }));
         setCurrentStep(4);
 
-        // --- Step 4: Start the server ---
-        await clearCache(); // Clear the TS/Webpack cache
-        await killExistingServers(); // Make absolutely sure port is clear
+        await clearCache();
+        await killExistingServers();
         
-        if (terminalRef.current?.writeToTerminal) {
+        if (terminalRef?.current?.writeToTerminal) {
           terminalRef.current.writeToTerminal("🚀 Starting development server...\r\n");
         }
         
         const cmd = await getStartCommand();
-        const startProcess = await instance.spawn("npm", ["run", cmd], {
-            env: { CI: "true" }
-        }); 
-        serverProcessRef.current = startProcess; // Save reference to kill later
+        const startProcess = await instance.spawn("npm", ["run", cmd], { env: { CI: "true" } }); 
+        serverProcessRef.current = startProcess;
 
         instance.on("server-ready", (port: number, url: string) => {
           console.log(`Server ready on port ${port} at ${url}`);
-          if (terminalRef.current?.writeToTerminal) {
+          if (terminalRef?.current?.writeToTerminal) {
             terminalRef.current.writeToTerminal(`🌐 Server ready at ${url}\r\n`);
           }
           setPreviewUrl(url);
@@ -267,7 +242,7 @@ const WebContainerPreview: React.FC<WebContainerPreviewProps> = ({
         startProcess.output.pipeTo(
           new WritableStream({
             write(data) {
-              if (terminalRef.current?.writeToTerminal) {
+              if (terminalRef?.current?.writeToTerminal) {
                 terminalRef.current.writeToTerminal(data);
               }
             },
@@ -278,26 +253,19 @@ const WebContainerPreview: React.FC<WebContainerPreviewProps> = ({
         console.error("Error setting up container:", err);
         const errorMessage = err instanceof Error ? err.message : String(err);
         
-        if (terminalRef.current?.writeToTerminal) {
+        if (terminalRef?.current?.writeToTerminal) {
           terminalRef.current.writeToTerminal(`❌ Error: ${errorMessage}\r\n`);
         }
         
         setSetupError(errorMessage);
         setIsSetupInProgress(false);
-        setLoadingState({
-          transforming: false,
-          mounting: false,
-          installing: false,
-          starting: false,
-          ready: false,
-        });
+        setLoadingState({ transforming: false, mounting: false, installing: false, starting: false, ready: false });
       }
     }
 
     setupContainer();
-  }, [instance, templateData, isSetupComplete, isSetupInProgress, isTerminalReady]);
+  }, [instance, templateData, isSetupComplete, isSetupInProgress, isTerminalReady, terminalRef]);
 
-  // Cleanup hook when component unmounts
   useEffect(() => {
     return () => {
       if (serverProcessRef.current) {
@@ -335,89 +303,38 @@ const WebContainerPreview: React.FC<WebContainerPreviewProps> = ({
   }
 
   const getStepIcon = (stepIndex: number) => {
-    if (stepIndex < currentStep) {
-      return <CheckCircle className="h-5 w-5 text-green-500" />;
-    } else if (stepIndex === currentStep) {
-      return <Loader2 className="h-5 w-5 animate-spin text-blue-500" />;
-    } else {
-      return <div className="h-5 w-5 rounded-full border-2 border-gray-300" />;
-    }
+    if (stepIndex < currentStep) return <CheckCircle className="h-5 w-5 text-green-500" />;
+    if (stepIndex === currentStep) return <Loader2 className="h-5 w-5 animate-spin text-blue-500" />;
+    return <div className="h-5 w-5 rounded-full border-2 border-gray-300" />;
   };
 
   const getStepText = (stepIndex: number, label: string) => {
     const isActive = stepIndex === currentStep;
     const isComplete = stepIndex < currentStep;
-    
     return (
-      <span className={`text-sm font-medium ${
-        isComplete ? 'text-green-600' : 
-        isActive ? 'text-blue-600' : 
-        'text-gray-500'
-      }`}>
+      <span className={`text-sm font-medium ${isComplete ? 'text-green-600' : isActive ? 'text-blue-600' : 'text-gray-500'}`}>
         {label}
       </span>
     );
   };
 
   return (
-    <div className="h-full w-full flex flex-col">
+    <div className="h-full w-full flex flex-col bg-[#1e1e1e]">
       {!previewUrl ? (
-        <div className="h-full flex flex-col">
-          <div className="w-full max-w-md p-6 m-5 rounded-lg bg-white dark:bg-zinc-800 shadow-sm mx-auto">
-            <Progress
-              value={(currentStep / totalSteps) * 100}
-              className="h-2 mb-6"
-            />
+        <div className="h-full flex items-center justify-center">
+          <div className="w-full max-w-md p-6 rounded-lg bg-white dark:bg-zinc-800 shadow-sm mx-auto">
+            <Progress value={(currentStep / totalSteps) * 100} className="h-2 mb-6" />
             <div className="space-y-4 mb-6">
-              <div className="flex items-center gap-3">
-                {getStepIcon(1)}
-                {getStepText(1, "Transforming template data")}
-              </div>
-              <div className="flex items-center gap-3">
-                {getStepIcon(2)}
-                {getStepText(2, "Mounting files")}
-              </div>
-              <div className="flex items-center gap-3">
-                {getStepIcon(3)}
-                {getStepText(3, "Installing dependencies")}
-              </div>
-              <div className="flex items-center gap-3">
-                {getStepIcon(4)}
-                {getStepText(4, "Starting development server")}
-              </div>
+              <div className="flex items-center gap-3">{getStepIcon(1)}{getStepText(1, "Transforming template data")}</div>
+              <div className="flex items-center gap-3">{getStepIcon(2)}{getStepText(2, "Mounting files")}</div>
+              <div className="flex items-center gap-3">{getStepIcon(3)}{getStepText(3, "Installing dependencies")}</div>
+              <div className="flex items-center gap-3">{getStepIcon(4)}{getStepText(4, "Starting development server")}</div>
             </div>
-          </div>
-
-          {/* Terminal */}
-          <div className="flex-1 p-4">
-            <TerminalComponent 
-              ref={terminalRef}
-              webContainerInstance={instance}
-              theme="dark"
-              className="h-full"
-            />
           </div>
         </div>
       ) : (
-        <div className="h-full flex flex-col">
-          {/* Preview */}
-          <div className="flex-1">
-            <iframe
-              src={previewUrl}
-              className="w-full h-full border-none"
-              title="WebContainer Preview"
-            />
-          </div>
-          
-          {/* Terminal at bottom when preview is ready */}
-          <div className="h-64 border-t">
-            <TerminalComponent 
-              ref={terminalRef}
-              webContainerInstance={instance}
-              theme="dark"
-              className="h-full"
-            />
-          </div>
+        <div className="h-full w-full">
+          <iframe src={previewUrl} className="w-full h-full border-none bg-white" title="WebContainer Preview" />
         </div>
       )}
     </div>

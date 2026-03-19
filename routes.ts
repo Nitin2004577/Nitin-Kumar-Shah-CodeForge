@@ -26,7 +26,9 @@ export const protectedRoutes: string[] = [
  */
 
 export const authRoutes: string[] = [
-    "/auth/sign-in",   // Added leading slash
+    // Added leading slash
+    "/auth/sign-in", 
+    "/auth/sign-up",
    
 ]
 
@@ -38,4 +40,4 @@ export const authRoutes: string[] = [
 
 export const apiAuthPrefix: string = "/api/auth"
 
-export const DEFAULT_LOGIN_REDIRECT = "/"; // Changed to redirect to home page after login
+export const DEFAULT_LOGIN_REDIRECT = "/dashboard"; // Changed to redirect to home page after login

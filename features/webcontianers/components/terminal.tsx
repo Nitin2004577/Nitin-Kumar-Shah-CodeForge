@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from "react";
@@ -9,7 +8,7 @@ import { SearchAddon } from "xterm-addon-search";
 import "xterm/css/xterm.css";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Copy, Trash2, Download } from "lucide-react";
+import { Search, Copy, Trash2, X, ChevronUp } from "lucide-react"; 
 import { cn } from "@/lib/utils";
 
 interface TerminalProps {
@@ -17,6 +16,7 @@ interface TerminalProps {
   className?: string;
   theme?: "dark" | "light";
   webContainerInstance?: any;
+  onClose?: () => void;
 }
 
 export interface TerminalRef {
@@ -29,7 +29,8 @@ const TerminalComponent = forwardRef<TerminalRef, TerminalProps>(({
   webcontainerUrl, 
   className,
   theme = "dark",
-  webContainerInstance
+  webContainerInstance,
+  onClose
 }, ref) => {
   const terminalRef = useRef<HTMLDivElement>(null);
   const term = useRef<Terminal | null>(null);
@@ -41,17 +42,15 @@ const TerminalComponent = forwardRef<TerminalRef, TerminalProps>(({
   const [searchTerm, setSearchTerm] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   
-  // Refs for logic (to avoid stale closures in event listeners)
+  // Refs for logic
   const currentLine = useRef<string>("");
   const cursorPosition = useRef<number>(0);
   const commandHistory = useRef<string[]>([]);
   const historyIndex = useRef<number>(-1);
   const currentProcess = useRef<any>(null);
   
-  // Keep track of the latest webContainerInstance without triggering re-renders
   const instanceRef = useRef(webContainerInstance);
 
-  // Update instance ref when prop changes
   useEffect(() => {
     instanceRef.current = webContainerInstance;
     if (webContainerInstance && term.current && !isConnected) {
@@ -63,36 +62,34 @@ const TerminalComponent = forwardRef<TerminalRef, TerminalProps>(({
 
   const terminalThemes = {
     dark: {
-      background: "#09090B", // Zinc-950
-      foreground: "#FAFAFA",
-      cursor: "#FAFAFA",
-      selection: "#27272A", // Zinc-800
-      black: "#18181B",
-      red: "#EF4444",
-      green: "#22C55E",
-      yellow: "#EAB308",
-      blue: "#3B82F6",
-      magenta: "#A855F7",
-      cyan: "#06B6D4",
-      white: "#F4F4F5",
+      background: "#1e1e1e",
+      foreground: "#CCCCCC",
+      cursor: "#CCCCCC",
+      selection: "#264F78",
+      black: "#000000",
+      red: "#CD3131",
+      green: "#0DBC79",
+      yellow: "#E5E510",
+      blue: "#2472C8",
+      magenta: "#BC3FBC",
+      cyan: "#11A8CD",
+      white: "#E5E5E5",
     },
     light: {
       background: "#FFFFFF",
-      foreground: "#18181B",
-      cursor: "#18181B",
-      selection: "#E4E4E7",
+      foreground: "#333333",
+      cursor: "#333333",
+      selection: "#ADD6FF",
       black: "#000000",
-      red: "#DC2626",
-      green: "#16A34A",
-      yellow: "#CA8A04",
-      blue: "#2563EB",
-      magenta: "#9333EA",
-      cyan: "#0891B2",
-      white: "#FFFFFF",
+      red: "#CD3131",
+      green: "#00BC00",
+      yellow: "#949800",
+      blue: "#0451A5",
+      magenta: "#BC05BC",
+      cyan: "#0598BC",
+      white: "#555555",
     },
   };
-
-  // --- Core Terminal Logic ---
 
   const writePrompt = useCallback(() => {
     if (term.current) {
@@ -104,53 +101,37 @@ const TerminalComponent = forwardRef<TerminalRef, TerminalProps>(({
 
   const executeCommand = useCallback(async (command: string) => {
     if (!instanceRef.current || !term.current) return;
-
     const trimmedCommand = command.trim();
-
-    // 1. Handle Empty Command
     if (!trimmedCommand) {
       writePrompt();
       return;
     }
-
-    // 2. Add to History
     if (commandHistory.current[commandHistory.current.length - 1] !== trimmedCommand) {
       commandHistory.current.push(trimmedCommand);
     }
     historyIndex.current = -1;
 
     try {
-      term.current.writeln(""); // Move to next line
-
-      // 3. Handle Built-in Commands
+      term.current.writeln("");
       if (trimmedCommand === "clear") {
         term.current.clear();
         writePrompt();
         return;
       }
 
-      // 4. Spawn Process in WebContainer
       const parts = trimmedCommand.split(' ');
       const cmd = parts[0];
       const args = parts.slice(1);
 
       const process = await instanceRef.current.spawn(cmd, args, {
-        terminal: {
-          cols: term.current.cols,
-          rows: term.current.rows,
-        },
+        terminal: { cols: term.current.cols, rows: term.current.rows },
       });
 
       currentProcess.current = process;
-
-      // Pipe Output to Terminal
       process.output.pipeTo(new WritableStream({
-        write(data) {
-          term.current?.write(data);
-        },
+        write(data) { term.current?.write(data); },
       }));
 
-      // Wait for exit
       await process.exit;
       currentProcess.current = null;
       writePrompt();
@@ -167,8 +148,7 @@ const TerminalComponent = forwardRef<TerminalRef, TerminalProps>(({
   const handleTerminalInput = useCallback((data: string) => {
     if (!term.current) return;
     
-    // Allow Ctrl+C to interrupt
-    if (data === '\u0003') { // Ctrl+C
+    if (data === '\u0003') { 
         if (currentProcess.current) {
             currentProcess.current.kill();
             currentProcess.current = null;
@@ -178,7 +158,6 @@ const TerminalComponent = forwardRef<TerminalRef, TerminalProps>(({
         return;
     }
 
-    // If a process is running, we send data to it (interactive mode)
     if (currentProcess.current) {
         const writer = currentProcess.current.input.getWriter();
         writer.write(data);
@@ -186,42 +165,30 @@ const TerminalComponent = forwardRef<TerminalRef, TerminalProps>(({
         return;
     }
 
-    // Otherwise, handle local shell editing
     switch (data) {
-      case '\r': // Enter
+      case '\r':
         executeCommand(currentLine.current);
         break;
-        
-      case '\u007F': // Backspace
+      case '\u007F':
         if (cursorPosition.current > 0) {
-          currentLine.current = 
-            currentLine.current.slice(0, cursorPosition.current - 1) + 
-            currentLine.current.slice(cursorPosition.current);
+          currentLine.current = currentLine.current.slice(0, cursorPosition.current - 1) + currentLine.current.slice(cursorPosition.current);
           cursorPosition.current--;
-          term.current.write('\b \b'); // Destructive backspace visual
+          term.current.write('\b \b');
         }
         break;
-        
-      case '\u001b[A': // Up arrow (History Prev)
+      case '\u001b[A':
         if (commandHistory.current.length > 0) {
-           const newIndex = historyIndex.current === -1 
-             ? commandHistory.current.length - 1 
-             : Math.max(0, historyIndex.current - 1);
-           
+           const newIndex = historyIndex.current === -1 ? commandHistory.current.length - 1 : Math.max(0, historyIndex.current - 1);
            historyIndex.current = newIndex;
            const cmd = commandHistory.current[newIndex];
-           
-           // Clear line and write new command
            term.current.write('\r$ \x1b[K' + cmd); 
            currentLine.current = cmd;
            cursorPosition.current = cmd.length;
         }
         break;
-        
-      case '\u001b[B': // Down arrow (History Next)
+      case '\u001b[B':
         if (historyIndex.current !== -1) {
             const newIndex = historyIndex.current + 1;
-            
             if (newIndex < commandHistory.current.length) {
                 historyIndex.current = newIndex;
                 const cmd = commandHistory.current[newIndex];
@@ -230,20 +197,15 @@ const TerminalComponent = forwardRef<TerminalRef, TerminalProps>(({
                 cursorPosition.current = cmd.length;
             } else {
                 historyIndex.current = -1;
-                term.current.write('\r$ \x1b[K'); // Clear line
+                term.current.write('\r$ \x1b[K');
                 currentLine.current = "";
                 cursorPosition.current = 0;
             }
         }
         break;
-        
       default:
-        // Regular typing
         if (data >= ' ' || data === '\t') {
-          currentLine.current = 
-            currentLine.current.slice(0, cursorPosition.current) + 
-            data + 
-            currentLine.current.slice(cursorPosition.current);
+          currentLine.current = currentLine.current.slice(0, cursorPosition.current) + data + currentLine.current.slice(cursorPosition.current);
           cursorPosition.current++;
           term.current.write(data);
         }
@@ -251,19 +213,16 @@ const TerminalComponent = forwardRef<TerminalRef, TerminalProps>(({
     }
   }, [executeCommand, writePrompt]);
 
-  // --- Lifecycle: Initialization ---
-
   useEffect(() => {
-    // Prevent double initialization
     if (term.current || !terminalRef.current) return;
 
     const terminal = new Terminal({
       cursorBlink: true,
-      fontFamily: '"Fira Code", "JetBrains Mono", monospace',
+      fontFamily: '"Fira Code", "JetBrains Mono", Consolas, monospace',
       fontSize: 13,
       lineHeight: 1.4,
       theme: terminalThemes[theme],
-      convertEol: true, // Crucial for proper newlines
+      convertEol: true,
     });
 
     const fit = new FitAddon();
@@ -277,12 +236,10 @@ const TerminalComponent = forwardRef<TerminalRef, TerminalProps>(({
     terminal.open(terminalRef.current);
     fit.fit();
     
-    // Bind refs
     term.current = terminal;
     fitAddon.current = fit;
     searchAddon.current = search;
 
-    // Attach Input Listener
     terminal.onData(handleTerminalInput);
 
     terminal.writeln("\x1b[34m🚀 WebContainer Terminal Ready\x1b[0m");
@@ -290,9 +247,7 @@ const TerminalComponent = forwardRef<TerminalRef, TerminalProps>(({
         terminal.writeln("Waiting for container...");
     }
 
-    // Handle Resize
     const resizeObserver = new ResizeObserver(() => {
-        // Small delay to ensure container has resized
         requestAnimationFrame(() => {
             fit.fit();
         });
@@ -300,29 +255,19 @@ const TerminalComponent = forwardRef<TerminalRef, TerminalProps>(({
     
     resizeObserver.observe(terminalRef.current);
 
-    // Cleanup
     return () => {
       resizeObserver.disconnect();
       terminal.dispose();
       term.current = null;
     };
-  }, []); // Empty dependency array ensures this runs ONCE only
+  }, []); 
 
-  // --- Exposed Methods ---
   useImperativeHandle(ref, () => ({
-    writeToTerminal: (data: string) => {
-      term.current?.write(data);
-    },
-    clearTerminal: () => {
-      term.current?.clear();
-      writePrompt();
-    },
-    focusTerminal: () => {
-      term.current?.focus();
-    },
+    writeToTerminal: (data: string) => { term.current?.write(data); },
+    clearTerminal: () => { term.current?.clear(); writePrompt(); },
+    focusTerminal: () => { term.current?.focus(); },
   }));
 
-  // Helper functions for toolbar
   const copyTerminalContent = () => {
     const selection = term.current?.getSelection();
     if (selection) navigator.clipboard.writeText(selection);
@@ -333,31 +278,26 @@ const TerminalComponent = forwardRef<TerminalRef, TerminalProps>(({
       writePrompt();
   };
 
-  const downloadTerminalLog = () => {
-    // Implementation for downloading log (optional)
-  };
-
   const performSearch = (text: string) => {
-      if(searchAddon.current) {
-          searchAddon.current.findNext(text);
-      }
+      if(searchAddon.current) searchAddon.current.findNext(text);
   };
 
   return (
-    <div className={cn("flex flex-col h-full w-full bg-[#09090B] border border-zinc-800 rounded-md overflow-hidden", className)}>
-      {/* Toolbar */}
-      <div className="flex items-center justify-between px-3 py-1.5 bg-zinc-900 border-b border-zinc-800">
-         <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-red-500"/>
-            <span className="w-2 h-2 rounded-full bg-yellow-500"/>
-            <span className="w-2 h-2 rounded-full bg-green-500"/>
-            <span className="text-xs text-zinc-400 font-mono ml-2">bash</span>
+    <div className={cn("flex flex-col h-full w-full bg-[#1e1e1e] border-t border-zinc-800 overflow-hidden", className)}>
+      {/* VS Code Style Header */}
+      <div className="flex items-center justify-between px-4 h-9 bg-[#1e1e1e] border-b border-zinc-800 shrink-0 select-none">
+         
+         {/* LEFT: ONLY Problems and Terminal */}
+         <div className="flex items-center gap-6 h-full text-[11px] font-medium tracking-wide">
+            <span className="text-zinc-500 hover:text-zinc-300 cursor-pointer uppercase">Problems</span>
+            <span className="text-zinc-100 uppercase border-b border-blue-500 h-full flex items-center pt-[1px] cursor-default">Terminal</span>
          </div>
          
-         <div className="flex items-center gap-1">
+         {/* RIGHT: Bash & VS Code Actions */}
+         <div className="flex items-center gap-1 text-zinc-400">
             {showSearch && (
                  <Input 
-                    className="h-6 w-32 text-xs bg-zinc-950 border-zinc-700" 
+                    className="h-6 w-32 text-xs bg-zinc-900 border-zinc-700 text-zinc-300" 
                     placeholder="Find..." 
                     value={searchTerm}
                     onChange={(e) => {
@@ -366,20 +306,38 @@ const TerminalComponent = forwardRef<TerminalRef, TerminalProps>(({
                     }}
                  />
             )}
-            <Button variant="ghost" size="icon" className="h-6 w-6 text-zinc-400 hover:text-white" onClick={() => setShowSearch(!showSearch)}>
-                <Search className="h-3 w-3" />
+            
+            <div className="flex items-center mr-2 px-2 hover:bg-zinc-800 rounded cursor-pointer text-xs h-6 transition-colors">
+               <span className="mr-1">bash</span>
+            </div>
+
+            <Button variant="ghost" size="icon" className="h-6 w-6 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded" onClick={() => setShowSearch(!showSearch)}>
+                <Search className="h-3.5 w-3.5" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-6 w-6 text-zinc-400 hover:text-white" onClick={copyTerminalContent}>
-                <Copy className="h-3 w-3" />
+            <Button variant="ghost" size="icon" className="h-6 w-6 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded" onClick={copyTerminalContent}>
+                <Copy className="h-3.5 w-3.5" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-6 w-6 text-zinc-400 hover:text-white" onClick={clearTerminal}>
-                <Trash2 className="h-3 w-3" />
+            <Button variant="ghost" size="icon" className="h-6 w-6 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded" onClick={clearTerminal}>
+                <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-6 w-6 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded">
+                <ChevronUp className="h-4 w-4" />
+            </Button>
+            
+            {/* The X button */}
+            <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-6 w-6 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded ml-1" 
+                onClick={() => onClose?.()}
+            >
+                <X className="h-4 w-4" />
             </Button>
          </div>
       </div>
 
-      <div className="flex-1 relative bg-[#09090B]">
-        <div ref={terminalRef} className="absolute inset-0 p-1" />
+      <div className="flex-1 relative bg-[#1e1e1e]">
+        <div ref={terminalRef} className="absolute inset-0 pl-4 py-2" />
       </div>
     </div>
   );
