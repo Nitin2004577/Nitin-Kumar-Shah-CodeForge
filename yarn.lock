@@ -3382,10 +3382,10 @@ zod@^4.1.13:
   resolved "https://registry.npmjs.org/zod/-/zod-4.1.13.tgz"
   integrity sha512-AvvthqfqrAhNH9dnfmrfKzX5upOdjUVJYFqNSlkmGf64gRaTzlPwz99IHYnVs28qYAybvAlBV+H7pn0saFY4Ig==
 
-zustand@^5.0.11:
-  version "5.0.11"
-  resolved "https://registry.npmjs.org/zustand/-/zustand-5.0.11.tgz"
-  integrity sha512-fdZY+dk7zn/vbWNCYmzZULHRrss0jx5pPFiOuMZ/5HJN6Yv3u+1Wswy/4MpZEkEGhtNH+pwxZB8OKgUBPzYAGg==
+zustand@^5.0.12:
+  version "5.0.12"
+  resolved "https://registry.npmjs.org/zustand/-/zustand-5.0.12.tgz"
+  integrity sha512-i77ae3aZq4dhMlRhJVCYgMLKuSiZAaUPAct2AksxQ+gOtimhGMdXljRT21P5BNpeT4kXlLIckvkPM029OljD7g==
 
 zwitch@^2.0.0:
   version "2.0.4"
