@@ -23,6 +23,12 @@ interface PlaygroundWorkspaceProps {
     onAccept: (editor: any, monaco: any) => void;
     onReject: (editor: any) => void;
     onTrigger: (type: string, editor: any) => void;
+    explanationData?: {
+      text: string;
+      type: string;
+      position: { line: number; column: number };
+    } | null;
+    clearExplanation?: () => void;
   };
   preview: {
     templateData: any;
@@ -49,14 +55,19 @@ export const PlaygroundWorkspace: React.FC<PlaygroundWorkspaceProps> = ({
       // FIX: Include the extension in the storage key to avoid collisions
       const fullPath = `${activeFile.filename}.${activeFile.fileExtension}`;
       const savedContent = localStorage.getItem(`file-storage-${fullPath}`);
-      
+
       if (savedContent && savedContent !== activeFile.content) {
         onContentChange(savedContent);
       }
-      
+
       lastLoadedFileId.current = activeFile.id;
     }
-  }, [activeFile?.id, activeFile?.filename, activeFile?.fileExtension, onContentChange]);
+  }, [
+    activeFile?.id,
+    activeFile?.filename,
+    activeFile?.fileExtension,
+    onContentChange,
+  ]);
 
   const handleSave = async (newContent: string) => {
     if (!activeFile || !preview.writeFileSync) return;
@@ -64,13 +75,13 @@ export const PlaygroundWorkspace: React.FC<PlaygroundWorkspaceProps> = ({
     try {
       // FIX: WebContainer MUST have the extension to bundle correctly
       const fullPath = `${activeFile.filename}.${activeFile.fileExtension}`;
-      
+
       // 1. Write to WebContainer
       await preview.writeFileSync(fullPath, newContent);
-      
+
       // 2. Persist to LocalStorage using the full path
       localStorage.setItem(`file-storage-${fullPath}`, newContent);
-      
+
       console.log(`🚀 Sync Successful: ${fullPath}`);
     } catch (err) {
       console.error("❌ Save failed:", err);
@@ -83,7 +94,9 @@ export const PlaygroundWorkspace: React.FC<PlaygroundWorkspaceProps> = ({
         <FileText className="h-16 w-16 text-muted-foreground/30" />
         <div className="text-center">
           <p className="text-lg font-medium text-foreground">No files open</p>
-          <p className="text-sm text-muted-foreground">Select a file to start</p>
+          <p className="text-sm text-muted-foreground">
+            Select a file to start
+          </p>
         </div>
       </div>
     );
@@ -108,6 +121,8 @@ export const PlaygroundWorkspace: React.FC<PlaygroundWorkspaceProps> = ({
             onAcceptSuggestion={ai.onAccept}
             onRejectSuggestion={ai.onReject}
             onTriggerSuggestion={ai.onTrigger}
+            explanationData={ai.explanationData || null}
+            clearExplanation={ai.clearExplanation || (() => {})}
           />
         </ResizablePanel>
 
