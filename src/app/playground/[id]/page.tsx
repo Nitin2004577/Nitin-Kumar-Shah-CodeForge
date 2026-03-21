@@ -44,12 +44,20 @@ const MainPlaygroundPage: React.FC = () => {
   const [terminalHeight, setTerminalHeight] = useState(256); // Default h-64 is 256px
   const [isDragging, setIsDragging] = useState(false);
   const dragRef = useRef(false); // Ref for immediate access in event listeners
-
   // --- 1. Global Stores & Data ---
   const { playgroundData, templateData, isLoading, error, saveTemplateData } =
     usePlayground(id);
   const explorer = useFileExplorer();
   const ai = useAISuggestions();
+
+  // ✨ FIX: Prevent "Ghost Files" from bleeding over from other projects
+  useEffect(() => {
+    // Whenever the project ID changes, force close all previously opened tabs
+    explorer.closeAllFiles();
+
+    // We strictly ONLY want this to run when 'id' changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
   // --- 2. Local Controller Logic ---
   const logic = usePlaygroundLogic(id, templateData, saveTemplateData);
@@ -68,7 +76,7 @@ const MainPlaygroundPage: React.FC = () => {
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!dragRef.current) return;
     const newHeight = window.innerHeight - e.clientY;
-    
+
     // Constrain height between 100px (min) and 80% of screen (max)
     if (newHeight > 100 && newHeight < window.innerHeight * 0.8) {
       setTerminalHeight(newHeight);
@@ -243,18 +251,21 @@ const MainPlaygroundPage: React.FC = () => {
   const activeFileRaw = explorer.openFiles.find(
     (f) => f.id === explorer.activeFileId
   );
-  
-  const originalFileData = templateData && explorer.activeFileId 
-    ? findOriginalFile(templateData, explorer.activeFileId) 
-    : null;
+
+  const originalFileData =
+    templateData && explorer.activeFileId
+      ? findOriginalFile(templateData, explorer.activeFileId)
+      : null;
 
   // If the file is unmodified, forcefully use the original content from the tree
-  const activeFile = activeFileRaw ? {
-    ...activeFileRaw,
-    content: activeFileRaw.hasUnsavedChanges 
-      ? activeFileRaw.content 
-      : (originalFileData?.content || activeFileRaw.content || "")
-  } : undefined;
+  const activeFile = activeFileRaw
+    ? {
+        ...activeFileRaw,
+        content: activeFileRaw.hasUnsavedChanges
+          ? activeFileRaw.content
+          : originalFileData?.content || activeFileRaw.content || "",
+      }
+    : undefined;
 
   const hasUnsaved = explorer.openFiles.some((f) => f.hasUnsavedChanges);
 
@@ -262,15 +273,27 @@ const MainPlaygroundPage: React.FC = () => {
     <TooltipProvider>
       <TemplateFileTree
         data={templateData}
-        onFileSelect={explorer.openFile}
-        selectedFile={activeFile}
+        onFileSelect={(file: any) => explorer.openFile(file)}
+        selectedFile={activeFile as any}
         title="Explorer"
-        onAddFile={logic.actions.handleAddFile}
-        onAddFolder={logic.actions.handleAddFolder}
-        onDeleteFile={logic.actions.handleDeleteFile}
-        onDeleteFolder={logic.actions.handleDeleteFolder}
-        onRenameFile={logic.actions.handleRenameFile}
-        onRenameFolder={logic.actions.handleRenameFolder}
+        onAddFile={(...args: any[]) =>
+          (logic.actions.handleAddFile as any)(...args)
+        }
+        onAddFolder={(...args: any[]) =>
+          (logic.actions.handleAddFolder as any)(...args)
+        }
+        onDeleteFile={(...args: any[]) =>
+          (logic.actions.handleDeleteFile as any)(...args)
+        }
+        onDeleteFolder={(...args: any[]) =>
+          (logic.actions.handleDeleteFolder as any)(...args)
+        }
+        onRenameFile={(...args: any[]) =>
+          (logic.actions.handleRenameFile as any)(...args)
+        }
+        onRenameFolder={(...args: any[]) =>
+          (logic.actions.handleRenameFolder as any)(...args)
+        }
       />
 
       <SidebarInset>
@@ -288,22 +311,21 @@ const MainPlaygroundPage: React.FC = () => {
           onCloseAll={explorer.closeAllFiles}
           onGitPush={() => setIsGitModalOpen(true)}
           isPushing={isPushing}
-          aiProps={{
-            isEnabled: ai.isEnabled,
-            onToggle: ai.toggleEnabled,
-            isLoading: ai.isLoading,
-          }}
+          aiProps={
+            {
+              isEnabled: ai.isEnabled,
+              onToggle: ai.toggleEnabled as any,
+              isLoading: ai.isLoading,
+            } as any
+          }
         />
 
         {/* 🚨 This prevents iframes from eating mouse events during a drag! */}
-        {isDragging && (
-          <div className="fixed inset-0 z-50 cursor-row-resize" />
-        )}
+        {isDragging && <div className="fixed inset-0 z-50 cursor-row-resize" />}
 
         <div className="h-[calc(100vh-4rem)] flex flex-col">
           {/* ✨ FIX 1: TABS AREA - Added min-w-0 to the tabs side to prevent squishing the buttons ✨ */}
           <div className="border-b bg-muted/30 shrink-0 flex items-center justify-between gap-2 pr-2">
-            
             {/* The actual Tabs block - strictly constrained to available space */}
             <div className="flex-1 min-w-0">
               <Tabs
@@ -346,14 +368,14 @@ const MainPlaygroundPage: React.FC = () => {
 
             {/* ✨ Fixed Action Buttons (Will never be pushed off screen now!) ✨ */}
             <div className="flex items-center gap-2 shrink-0 py-2">
-              <Button 
-                size="sm" 
-                variant={isTerminalVisible ? "secondary" : "default"} 
-                onClick={() => setIsTerminalVisible(!isTerminalVisible)} 
+              <Button
+                size="sm"
+                variant={isTerminalVisible ? "secondary" : "default"}
+                onClick={() => setIsTerminalVisible(!isTerminalVisible)}
                 className="h-6 px-2 text-xs shrink-0"
               >
                 <TerminalSquare className="w-3 h-3 mr-1.5" />
-                {isTerminalVisible ? 'Hide Terminal' : 'Terminal'}
+                {isTerminalVisible ? "Hide Terminal" : "Terminal"}
               </Button>
 
               {explorer.openFiles.length > 1 && (
@@ -386,16 +408,21 @@ const MainPlaygroundPage: React.FC = () => {
                 onAccept: ai.acceptSuggestion,
                 onReject: ai.rejectSuggestion,
                 onTrigger: ai.fetchSuggestion,
+                // ✨ ADD THESE TWO NEW LINES HERE ✨
+                explanationData: ai.explanationData,
+                clearExplanation: ai.clearExplanation,
               }}
-              preview={{
-                templateData: templateData!,
-                instance: logic.instance,
-                serverUrl: logic.serverUrl || "",
-                isLoading: logic.containerLoading,
-                error: logic.containerError,
-                writeFileSync: logic.writeFileSync,
-                terminalRef: terminalRef,
-              }}
+              preview={
+                {
+                  templateData: templateData!,
+                  instance: logic.instance,
+                  serverUrl: logic.serverUrl || "",
+                  isLoading: logic.containerLoading,
+                  error: logic.containerError,
+                  writeFileSync: logic.writeFileSync,
+                  terminalRef: terminalRef,
+                } as any
+              }
             />
           </div>
 
@@ -413,13 +440,13 @@ const MainPlaygroundPage: React.FC = () => {
 
           {/* TERMINAL CONTAINER */}
           {isTerminalVisible && (
-            <div 
+            <div
               style={{ height: `${terminalHeight}px` }}
               className="border-t border-border shrink-0 bg-[#1e1e1e] flex flex-col"
             >
               {/* ✨ FIX 2: Removed the redundant custom header. Only the internal TerminalComponent will show now! */}
               <div className="flex-1 min-h-0">
-                <TerminalComponent 
+                <TerminalComponent
                   ref={terminalRef}
                   webContainerInstance={logic.instance}
                   theme="dark"

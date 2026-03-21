@@ -77,7 +77,7 @@ export function Header() {
                   <span className="text-zinc-300 dark:text-zinc-700">|</span>
                   {/* <HeaderPro /> */}
                   <ThemeToggle />
-                  <UserButton/>
+                  <UserButton />
                 </div>
 
                 {/* Mobile Navigation remains unchanged */}
@@ -95,7 +95,7 @@ export function Header() {
                     API
                   </Link>
                   <ThemeToggle />
-                  <UserButton/>
+                  <UserButton />
                 </div>
               </div>
             </div>
