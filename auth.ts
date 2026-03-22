@@ -39,17 +39,20 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
       return token;
     },
     
-    async session({ session, token }) {
+   async session({ session, token }) {
       if (session.user) {
+        // 🚀 The magic trick: tell TS that this specific reference is 'any'
+        const customUser = session.user as any;
+        
         // Attach the ID and Role
         if (token.sub) {
-          session.user.id = token.sub;
+          customUser.id = token.sub;
         }
-        session.user.role = token.role as any;
+        customUser.role = token.role;
         
         // Attach the Access Token and Provider
-        session.user.accessToken = token.accessToken as string;
-        session.user.provider = token.provider as string;
+        customUser.accessToken = token.accessToken;
+        customUser.provider = token.provider;
       }
       return session;
     },

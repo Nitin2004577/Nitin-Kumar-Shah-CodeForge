@@ -4,13 +4,20 @@ import { NextResponse } from "next/server";
 export async function POST(req: Request) {
   try {
     const session = await auth();
-    if (!session?.user?.accessToken) {
+    
+    // 🚀 THE MAGIC TRICK: Extract the user as 'any'
+    const customUser = session?.user as any;
+
+    // Use customUser instead of session.user
+    if (!customUser?.accessToken) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { repo, message, files } = await req.json();
     const [owner, repoName] = repo.split("/");
-    const token = session.user.accessToken;
+    
+    // Use customUser again!
+    const token = customUser.accessToken;
 
     // 1. Check if the branch exists
     const branchRes = await fetch(`https://api.github.com/repos/${owner}/${repoName}/branches/main`, {

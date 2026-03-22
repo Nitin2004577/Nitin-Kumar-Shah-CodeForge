@@ -5,14 +5,18 @@ export async function GET() {
   try {
     const session = await auth();
 
-    // Check if user is logged in and has a token
-    if (!session?.user?.accessToken) {
+    // 🚀 THE MAGIC TRICK: Extract the user as 'any'
+    const customUser = session?.user as any;
+
+    // Check if user is logged in and has a token using customUser
+    if (!customUser?.accessToken) {
       return NextResponse.json({ error: "NOT_CONNECTED" }, { status: 400 });
     }
 
     const response = await fetch("https://api.github.com/user/repos?sort=updated&per_page=100", {
       headers: {
-        Authorization: `Bearer ${session.user.accessToken}`,
+        // Use customUser here too!
+        Authorization: `Bearer ${customUser.accessToken}`,
         Accept: "application/vnd.github.v3+json",
       },
     });
