@@ -5,8 +5,8 @@ import Editor, { type Monaco } from "@monaco-editor/react";
 import {
   configureMonaco,
   defaultEditorOptions,
-} from "@/../../features/playground/lib/editor-config";
-import type { TemplateFile } from "@/../../features/playground/lib/path-to-json";
+} from "../lib/editor-config";
+import type { TemplateFile } from "../lib/path-to-json";
 
 interface PlaygroundEditorProps {
   activeFile: (TemplateFile & { id: string }) | undefined;

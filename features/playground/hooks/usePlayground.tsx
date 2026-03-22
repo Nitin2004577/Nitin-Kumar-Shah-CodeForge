@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
-import { getPlaygroundById, SaveUpdatedCode } from '@/../../features/playground/actions/index';
-import type { TemplateFolder } from '@/../../features/playground/lib/path-to-json';
+import { getPlaygroundById, SaveUpdatedCode } from '../actions';
+import type { TemplateFolder } from '../lib/path-to-json';
 
 interface PlaygroundData {
   id: string;
