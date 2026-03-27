@@ -6,6 +6,7 @@ import path from "path";
 import fs from "fs/promises";
 import { existsSync } from "fs";
 import { NextRequest } from "next/server";
+import os from "os"; // 👈 VERCEL FIX: Import 'os' to access the allowed temporary directory
 
 // Helper function to ensure valid JSON
 function validateJsonStructure(data: unknown): boolean {
@@ -44,28 +45,25 @@ export async function GET(
   }
 
   try {
-    // 1. Build Absolute Path: process.cwd() points to E:\Final Year\FYP\code\CodeForge
-    // We join it with 'CodeForge-starters' and the specific template folder
+    // 1. Build Absolute Path to your starter files
     const inputPath = path.resolve(process.cwd(), relativeTemplatePath);
     
-    const outputDir = path.resolve(process.cwd(), "output");
-    const outputFile = path.join(outputDir, `${templateKey}.json`);
+    // 2. VERCEL FIX: We MUST use the system's /tmp directory for writing files!
+    const tmpDir = os.tmpdir();
+    // We add Date.now() to make sure multiple users don't overwrite each other's files
+    const outputFile = path.join(tmpDir, `${templateKey}-${Date.now()}.json`);
 
-    // DEBUG LOGS - Check your terminal for these!
+    // DEBUG LOGS
     console.log("--- Path Debugging ---");
-    console.log("Project Root:", process.cwd());
     console.log("Target Path:", inputPath);
     console.log("Folder Exists?:", existsSync(inputPath));
     console.log("----------------------");
 
     if (!existsSync(inputPath)) {
-        throw new Error(`Directory not found at: ${inputPath}`);
+        throw new Error(`Directory not found at: ${inputPath}. Vercel might not have bundled this folder.`);
     }
 
-    // 2. Ensure output folder exists
-    await fs.mkdir(outputDir, { recursive: true });
-
-    // 3. Process the structure
+    // 3. Process the structure and save it to the /tmp folder
     await saveTemplateStructureToJson(inputPath, outputFile);
     const result = await readTemplateStructureFromJson(outputFile);
 
@@ -73,7 +71,7 @@ export async function GET(
       return Response.json({ error: "Invalid JSON structure" }, { status: 500 });
     }
 
-    // 4. Cleanup
+    // 4. Cleanup the temporary file so we don't clog up Vercel's memory
     await fs.unlink(outputFile);
 
     return Response.json({ success: true, templateJson: result }, { status: 200 });
