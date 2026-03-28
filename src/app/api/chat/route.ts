@@ -65,7 +65,7 @@ export async function POST(req: Request) {
         "Authorization": `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: "gemini-1.5-flash", // Fast, highly capable coding model
+        model: "gemini-2.5-flash", // Fast, highly capable coding model
         messages: messages,
         temperature: 0.2, // Keep it focused and deterministic for coding
       }),
@@ -83,7 +83,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       suggestion: aiText, // Required by useAISuggestions.tsx
       response: aiText,   // Required by your Chat UI
-      model: "gemini-1.5-flash",
+      model: "gemini-2.5-flash",
       tokens: data.usage?.total_tokens || 0,
     });
 
