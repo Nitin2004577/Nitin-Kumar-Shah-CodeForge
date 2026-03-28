@@ -1,0 +1,40 @@
+{
+  "folderName": "react",
+  "items": [
+    {
+      "filename": "package",
+      "fileExtension": "json",
+      "content": "{\r\n  \"name\": \"react-starter\",\r\n  \"private\": true,\r\n  \"dependencies\": {\r\n    \"react\": \"^18.2.0\",\r\n    \"react-dom\": \"^18.2.0\"\r\n  },\r\n  \"scripts\": {\r\n    \"start\": \"PORT=3001 react-scripts start\",\r\n    \"build\": \"react-scripts build\",\r\n    \"test\": \"react-scripts test --env=jsdom\",\r\n    \"eject\": \"react-scripts eject\"\r\n  },\r\n  \"devDependencies\": {\r\n    \"react-scripts\": \"^5.0.1\"\r\n  },\r\n  \"browserslist\": [\r\n    \"defaults\"\r\n  ]\r\n}"
+    },
+    {
+      "folderName": "public",
+      "items": [
+        {
+          "filename": "index",
+          "fileExtension": "html",
+          "content": "<div id=\"app\"></div>"
+        }
+      ]
+    },
+    {
+      "folderName": "src",
+      "items": [
+        {
+          "filename": "App",
+          "fileExtension": "js",
+          "content": "import React from 'react';\nimport './style.css';\n\nexport default function App() {\n  return (\n    <div>\n      <h1>Hello StackBlitz!</h1>\n      <p>Start editing to see some magic happen :)</p>\n    </div>\n  );\n}\n"
+        },
+        {
+          "filename": "index",
+          "fileExtension": "js",
+          "content": "import React, { StrictMode } from 'react';\nimport { createRoot } from 'react-dom/client';\n\nimport App from './App';\n\nconst root = createRoot(document.getElementById('app'));\n\nroot.render(\n  <StrictMode>\n    <App />\n  </StrictMode>\n);\n"
+        },
+        {
+          "filename": "style",
+          "fileExtension": "css",
+          "content": "* {\n  box-sizing: border-box;\n}\n\nbody {\n  margin: 0;\n  padding: 1rem;\n  font-family: system-ui, sans-serif;\n  color: black;\n  background-color: white;\n}\n\nh1 {\n  font-weight: 800;\n  font-size: 1.5rem;\n}\n"
+        }
+      ]
+    }
+  ]
+}

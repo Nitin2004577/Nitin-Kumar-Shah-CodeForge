@@ -10,7 +10,7 @@ export async function POST(req: Request) {
       fileContent, cursorLine, cursorColumn, suggestionType // Used by Explain/Debug/Suggest
     } = body;
 
-    let ollamaMessages: any[] = [];
+    let messages: any[] = [];
     let systemPrompt = "You are a helpful AI coding assistant. Provide clean, efficient code and concise explanations.";
 
     // --- SCENARIO 1: Context Menu (Explain, Debug, or Autocomplete) ---
@@ -31,14 +31,14 @@ export async function POST(req: Request) {
         promptMessage = `Complete the following code. ONLY output the missing code that comes immediately after this:\n\n\`\`\`\n${fileContent}\n\`\`\``;
       }
 
-      ollamaMessages = [
+      messages = [
         { role: "system", content: systemPrompt },
         { role: "user", content: promptMessage }
       ];
     } 
     // --- SCENARIO 2: Chat Sidebar ---
     else if (message) {
-      ollamaMessages = [
+      messages = [
         { role: "system", content: systemPrompt },
         ...(history || []).map((msg: any) => ({
           role: msg.role,
@@ -50,36 +50,47 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid request payload" }, { status: 400 });
     }
 
-    // Call your local Ollama instance
-    const response = await fetch("http://127.0.0.1:11434/api/chat", {
+    // Ensure the API key exists
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      console.error("Missing GEMINI_API_KEY environment variable.");
+      return NextResponse.json({ error: "AI API key not configured on server." }, { status: 500 });
+    }
+
+    // Call Google Gemini using the OpenAI-compatible endpoint
+    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`
+      },
       body: JSON.stringify({
-        model: "qwen2.5-coder:1.5b", // Your local model
-        messages: ollamaMessages,
-        stream: false, 
+        model: "gemini-1.5-flash", // Fast, highly capable coding model
+        messages: messages,
+        temperature: 0.2, // Keep it focused and deterministic for coding
       }),
     });
 
     if (!response.ok) {
-      throw new Error(`Ollama error: ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(`API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
-    const aiText = data.message.content;
+    const aiText = data.choices[0].message.content;
 
     // We return BOTH keys so it works for the Chat UI and the Context Menu UI perfectly!
     return NextResponse.json({
       suggestion: aiText, // Required by useAISuggestions.tsx
       response: aiText,   // Required by your Chat UI
-      model: data.model,
-      tokens: data.eval_count || 0,
+      model: "gemini-1.5-flash",
+      tokens: data.usage?.total_tokens || 0,
     });
 
   } catch (error: any) {
-    console.error("Ollama API Error:", error);
+    console.error("AI API Error:", error);
     return NextResponse.json(
-      { error: "Is Ollama running? Make sure to run 'ollama serve' in your terminal." },
+      { error: "Failed to connect to the AI provider." },
       { status: 500 }
     );
   }
