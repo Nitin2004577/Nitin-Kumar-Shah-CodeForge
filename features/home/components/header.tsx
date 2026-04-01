@@ -1,5 +1,4 @@
 import Link from "next/link";
-import Image from "next/image";
 import { ThemeToggle } from "../../../src/components/ui/theme-toggle";
 import UserButton from "../../auth/components/user-button";
 
@@ -33,14 +32,7 @@ export function Header() {
                     href="/"
                     className="flex items-center gap-2 justify-center"
                   >
-                    <Image
-                      src={"/logo.png"}
-                      alt="Logo"
-                      height={60}
-                      width={60}
-                    />
-
-                    <span className="hidden sm:block font-extrabold text-lg">
+                    <span className="font-extrabold text-lg">
                       CodeForge Editor
                     </span>
                   </Link>
