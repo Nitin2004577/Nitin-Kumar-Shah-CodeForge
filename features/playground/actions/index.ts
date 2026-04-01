@@ -76,10 +76,6 @@ export const createPlayground = async (data:{
 export const getAllPlaygroundForUser = async ()=>{
     const user = await currentUser();
     
-    // 🚨 DEBUG LOG: Let's see exactly what we are dealing with!
-    console.log("🚨 DEBUG - CURRENT USER RESULT IN ACTION:", user); 
-    
-    // Stop immediately if there's no user ID
     if (!user || !user.id) {
         throw new Error("Unauthorized: User ID is missing.");
     }

@@ -10,7 +10,6 @@ import {
   duplicateProjectById,
 } from "../../../../features/playground/actions";
 import { currentUser } from "../../../../features/auth/actions";
-import { auth } from "@/../auth"; // Keeping your existing imports
 
 const EmptyState = () => (
   <div className="flex flex-col items-center justify-center py-16">
@@ -27,20 +26,11 @@ const EmptyState = () => (
 );
 
 const DashboardMainPage = async () => {
-  // 1. Get the current logged-in user FIRST
   const userData = await currentUser();
-  console.log("Current User:", userData);
-
-  // 2. Fetch the playgrounds
   const allPlaygrounds = await getAllPlaygroundForUser();
-  
-  // 3. SECURITY FIX: Filter the projects to ONLY match the logged-in user
-  // (Assuming your project object has a userId property. If it's named differently, change 'userId' below!)
   const userPlaygrounds = allPlaygrounds?.filter(
     (project: any) => project.userId === userData?.id
   ) || [];
-
-  console.log("Filtered Playgrounds for this user:", userPlaygrounds);
 
   return (
     <div className="flex flex-col justify-start items-center min-h-screen mx-auto max-w-7xl px-4 py-10">
