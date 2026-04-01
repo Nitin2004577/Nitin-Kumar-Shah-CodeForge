@@ -234,25 +234,28 @@ const TerminalComponent = forwardRef<TerminalRef, TerminalProps>(({
     terminal.loadAddon(search);
 
     terminal.open(terminalRef.current);
-    fit.fit();
-    
+
     term.current = terminal;
     fitAddon.current = fit;
     searchAddon.current = search;
 
     terminal.onData(handleTerminalInput);
 
-    terminal.writeln("\x1b[34m🚀 WebContainer Terminal Ready\x1b[0m");
-    if (!webContainerInstance) {
+    // Defer fit() until the DOM element has real dimensions
+    requestAnimationFrame(() => {
+      try { fit.fit(); } catch (_) {}
+      terminal.writeln("\x1b[34m🚀 WebContainer Terminal Ready\x1b[0m");
+      if (!webContainerInstance) {
         terminal.writeln("Waiting for container...");
-    }
+      }
+    });
 
     const resizeObserver = new ResizeObserver(() => {
-        requestAnimationFrame(() => {
-            fit.fit();
-        });
+      requestAnimationFrame(() => {
+        try { fit.fit(); } catch (_) {}
+      });
     });
-    
+
     resizeObserver.observe(terminalRef.current);
 
     return () => {
