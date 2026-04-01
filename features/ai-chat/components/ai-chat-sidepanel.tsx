@@ -257,6 +257,7 @@ export const AIChatSidePanel: React.FC<AIChatSidePanelProps> = ({
         : chatMode === "fix"
         ? "error_fix"
         : "optimization";
+
     const newMessage: ChatMessage = {
       role: "user",
       content: input.trim(),
@@ -269,6 +270,10 @@ export const AIChatSidePanel: React.FC<AIChatSidePanelProps> = ({
     setMessages((prev) => [...prev, newMessage]);
     setInput("");
     setIsLoading(true);
+
+    // ✨ 1. Create an AbortController for a 15-second timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
 
     try {
       let contextualMessage = getChatModePrompt(chatMode, input.trim(), {
@@ -299,15 +304,21 @@ export const AIChatSidePanel: React.FC<AIChatSidePanelProps> = ({
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        // ✨ 2. Attach the abort signal to the fetch request
+        signal: controller.signal,
         body: JSON.stringify({
           message: contextualMessage,
           history: messages
             .slice(-10)
             .map((msg) => ({ role: msg.role, content: msg.content })),
-          stream: streamResponse,
+          // ✨ 3. Force stream to false since we are expecting a single JSON response
+          stream: false,
           mode: chatMode,
         }),
       });
+
+      // ✨ Clear the timeout if the request succeeds!
+      clearTimeout(timeoutId);
 
       if (response.ok) {
         const data = await response.json();
@@ -337,21 +348,26 @@ export const AIChatSidePanel: React.FC<AIChatSidePanelProps> = ({
           ...prev,
           {
             role: "assistant",
-            content:
-              "Sorry, I encountered an error while processing your request. Please try again.",
+            content: `Error: The server responded with status ${response.status}. Please try again.`,
             timestamp: new Date(),
             id: Date.now().toString(),
           },
         ]);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error sending message:", error);
+
+      // ✨ 4. Handle the specific timeout error cleanly
+      const isTimeout = error.name === "AbortError";
+      const errorMessage = isTimeout
+        ? "The request timed out because the AI took too long to respond. Please try again."
+        : "I'm having trouble connecting right now. Please check your internet connection and try again.";
+
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content:
-            "I'm having trouble connecting right now. Please check your internet connection and try again.",
+          content: errorMessage,
           timestamp: new Date(),
           id: Date.now().toString(),
         },
@@ -359,6 +375,7 @@ export const AIChatSidePanel: React.FC<AIChatSidePanelProps> = ({
     } finally {
       setIsLoading(false);
       setAttachments([]);
+      clearTimeout(timeoutId); // Safety clear
     }
   };
 

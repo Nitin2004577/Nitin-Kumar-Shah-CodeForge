@@ -1,5 +1,5 @@
-import { useState, useCallback } from "react";
-import { toast } from "sonner"; // Using your existing sonner toast for explanations!
+import { useState, useCallback, useRef } from "react";
+import { toast } from "sonner";
 
 interface AISuggestionsState {
   suggestion: string | null;
@@ -7,7 +7,6 @@ interface AISuggestionsState {
   position: { line: number; column: number } | null;
   decoration: string[];
   isEnabled: boolean;
-  // ✨ NEW: State to hold our inline explanation data
   explanationData: {
     text: string;
     type: string;
@@ -17,12 +16,10 @@ interface AISuggestionsState {
 
 interface UseAISuggestionsReturn extends AISuggestionsState {
   toggleEnabled: () => void;
-  // ✨ Updated signature to accept either the editor OR a string payload
   fetchSuggestion: (type: string, payloadOrEditor: any) => Promise<void>;
   acceptSuggestion: (editor: any, monaco: any) => void;
   rejectSuggestion: (editor: any) => void;
   clearSuggestion: (editor: any) => void;
-  // ✨ FIX: Add clearExplanation to the return interface
   clearExplanation: () => void;
 }
 
@@ -33,33 +30,38 @@ export const useAISuggestions = (): UseAISuggestionsReturn => {
     position: null,
     decoration: [],
     isEnabled: true,
-    explanationData: null, // Initialize to null
+    explanationData: null,
   });
 
-  // ✨ FIX: Add the missing toggleEnabled function
+  // ✨ DEBOUNCE TIMER REF
+  // We use this to keep track of our active setTimeout so we can cancel it
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   const toggleEnabled = useCallback(() => {
     setState((prev) => ({ ...prev, isEnabled: !prev.isEnabled }));
   }, []);
 
-  // Add this new function right below your other callbacks
   const clearExplanation = useCallback(() => {
     setState((prev) => ({ ...prev, explanationData: null }));
   }, []);
 
   const fetchSuggestion = useCallback(
     async (type: string, payloadOrEditor: any) => {
+      
+      // 1. Immediately cancel any pending API calls
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+
       setState((currentState) => {
         if (!currentState.isEnabled) {
-          console.warn("AI suggestions are disabled.");
           return currentState;
         }
 
         if (!payloadOrEditor) {
-          console.warn("No editor or text payload provided.");
           return currentState;
         }
 
-        // ✨ SMART DETECTION: Is this an Editor object or a Text string?
         const isEditor = typeof payloadOrEditor.getModel === "function";
 
         let fileContent = "";
@@ -68,7 +70,6 @@ export const useAISuggestions = (): UseAISuggestionsReturn => {
         let positionToSave = currentState.position;
 
         if (isEditor) {
-          // Old way: Extract from editor
           const model = payloadOrEditor.getModel();
           const cursorPosition = payloadOrEditor.getPosition();
           if (model && cursorPosition) {
@@ -81,21 +82,20 @@ export const useAISuggestions = (): UseAISuggestionsReturn => {
             };
           }
         } else if (typeof payloadOrEditor === "string") {
-          // New way: We were passed a direct string (e.g., highlighted text)
           fileContent = payloadOrEditor;
         }
 
-        // Set loading state
+        // 2. Set the loading state visually so the user knows it's thinking
         const newState = { ...currentState, isLoading: true };
 
-        // Perform the async API call
-        (async () => {
+        // 3. Start the new Debounce Timer (1500 milliseconds = 1.5 seconds)
+        debounceTimerRef.current = setTimeout(async () => {
           try {
             const payload = {
               fileContent,
               cursorLine,
               cursorColumn,
-              suggestionType: type, // "suggest", "explain", or "debug"
+              suggestionType: type, 
             };
 
             const response = await fetch("/api/chat", {
@@ -112,9 +112,7 @@ export const useAISuggestions = (): UseAISuggestionsReturn => {
             if (data.suggestion) {
               const resultText = data.suggestion.trim();
 
-              // ✨ UI ROUTING: Explanations to Inline Widget, Suggestions to Ghost Text
               if (type === "explain" || type === "debug") {
-                // Instead of toasting, we save it to state!
                 setState((prev) => ({
                   ...prev,
                   isLoading: false,
@@ -125,7 +123,6 @@ export const useAISuggestions = (): UseAISuggestionsReturn => {
                   },
                 }));
               } else {
-                // Standard ghost text suggestion
                 setState((prev) => ({
                   ...prev,
                   suggestion: resultText,
@@ -138,10 +135,13 @@ export const useAISuggestions = (): UseAISuggestionsReturn => {
             }
           } catch (error) {
             console.error("Error fetching code suggestion:", error);
-            toast.error("AI failed to generate a response.");
+            // Only show toast if it's NOT a background suggest, to avoid annoying spam
+            if (type !== 'suggest') {
+                toast.error("AI failed to generate a response. Please try again in a moment.");
+            }
             setState((prev) => ({ ...prev, isLoading: false }));
           }
-        })();
+        }, 3000); // Increased debounce to preserve API quota
 
         return newState;
       });
@@ -151,20 +151,12 @@ export const useAISuggestions = (): UseAISuggestionsReturn => {
 
   const acceptSuggestion = useCallback((editor: any, monaco: any) => {
     setState((currentState) => {
-      if (
-        !currentState.suggestion ||
-        !currentState.position ||
-        !editor ||
-        !monaco
-      ) {
+      if (!currentState.suggestion || !currentState.position || !editor || !monaco) {
         return currentState;
       }
 
       const { line, column } = currentState.position;
-      const sanitizedSuggestion = currentState.suggestion.replace(
-        /^\d+:\s*/gm,
-        ""
-      );
+      const sanitizedSuggestion = currentState.suggestion.replace(/^\d+:\s*/gm, "");
 
       editor.executeEdits("", [
         {
@@ -222,6 +214,6 @@ export const useAISuggestions = (): UseAISuggestionsReturn => {
     acceptSuggestion,
     rejectSuggestion,
     clearSuggestion,
-    clearExplanation, // ✨ FIX: Added to the return block!
+    clearExplanation,
   };
 };
