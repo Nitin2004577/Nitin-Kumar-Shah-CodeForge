@@ -1,6 +1,7 @@
 import { SidebarProvider } from "@/components/ui/sidebar"
 import { DashboardSidebar } from "../../../../features/dashboard/components/dashboard-sidebar"
 import { getAllPlaygroundForUser } from "../../../../features/playground/actions"
+import { currentUser } from "../../../../features/auth/actions"
 import type React from "react"
 
 export default async function DashboardLayout({
@@ -8,9 +9,11 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const playgroundData = await getAllPlaygroundForUser()
+  const [playgroundData, user] = await Promise.all([
+    getAllPlaygroundForUser(),
+    currentUser(),
+  ])
 
-  // Store icon names (strings) instead of the components themselves
   const technologyIconMap: Record<string, string> = {
     REACT: "Zap",
     NEXTJS: "Lightbulb",
@@ -32,15 +35,20 @@ export default async function DashboardLayout({
       id: item.id,
       name: item.title,
       starred: item.Starmark?.[0]?.isMarked || false,
-      // Pass the icon name as a string
-      icon: technologyIconMap[item.template] || "Code2", // Default to "Code2" if template not found
+      icon: technologyIconMap[item.template] || "Code2",
     })) || []
 
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full overflow-x-hidden">
-        {/* Pass the formatted data with string icon names */}
-        <DashboardSidebar initialPlaygroundData={formattedPlaygroundData} />
+        <DashboardSidebar
+          initialPlaygroundData={formattedPlaygroundData}
+          user={{
+            name: user?.name ?? "",
+            email: user?.email ?? "",
+            image: user?.image ?? "",
+          }}
+        />
         <main className="flex-1">{children}</main>
       </div>
     </SidebarProvider>

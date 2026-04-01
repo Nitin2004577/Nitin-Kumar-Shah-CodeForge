@@ -3,6 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { signOut } from "next-auth/react"
 import {
   Code2,
   Compass,
@@ -19,8 +20,16 @@ import {
   Zap,
   Database,
   FlameIcon,
+  LogOut,
+  User,
 } from "lucide-react"
-import { Button } from "../../../src/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   Sidebar,
   SidebarContent,
@@ -35,94 +44,77 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar"
-import Image from "next/image"
 
-// Define the interface for a single playground item, icon is now a string
 interface PlaygroundData {
   id: string
   name: string
-  icon: string // Changed to string
+  icon: string
   starred: boolean
 }
 
-// Map icon names (strings) to their corresponding LucideIcon components
-const lucideIconMap: Record<string, LucideIcon> = {
-  Zap: Zap,
-  Lightbulb: Lightbulb,
-  Database: Database,
-  Compass: Compass,
-  FlameIcon: FlameIcon,
-  Terminal: Terminal,
-  Code2: Code2, // Include the default icon
-  // Add any other icons you might use dynamically
+interface SidebarUser {
+  name: string
+  email: string
+  image: string
 }
 
-export function DashboardSidebar({ initialPlaygroundData }: { initialPlaygroundData: PlaygroundData[] }) {
+const lucideIconMap: Record<string, LucideIcon> = {
+  Zap, Lightbulb, Database, Compass, FlameIcon, Terminal, Code2,
+}
+
+export function DashboardSidebar({
+  initialPlaygroundData,
+  user,
+}: {
+  initialPlaygroundData: PlaygroundData[]
+  user: SidebarUser
+}) {
   const pathname = usePathname()
-  const [starredPlaygrounds, setStarredPlaygrounds] = useState(initialPlaygroundData.filter((p) => p.starred))
-  const [recentPlaygrounds, setRecentPlaygrounds] = useState(initialPlaygroundData)
+  const [starredPlaygrounds] = useState(initialPlaygroundData.filter((p) => p.starred))
+  const [recentPlaygrounds] = useState(initialPlaygroundData)
 
   return (
-    <Sidebar variant="inset" collapsible="icon" className="border-1 border-r">
+    <Sidebar variant="inset" collapsible="icon" className="border-r">
       <SidebarHeader>
         <div className="flex items-center gap-2 px-4 py-3 justify-center">
-          <Image src={"/logo.png"} alt="logo" height={60} width={60} />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="logo" height={60} width={60} />
         </div>
-       
       </SidebarHeader>
+
       <SidebarContent>
         <SidebarGroup>
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton asChild isActive={pathname === "/"} tooltip="Home">
-                <Link href="/">
-                  <Home className="h-4 w-4" />
-                  <span>Home</span>
-                </Link>
+                <Link href="/"><Home className="h-4 w-4" /><span>Home</span></Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton asChild isActive={pathname === "/dashboard"} tooltip="Dashboard">
-                <Link href="/dashboard">
-                  <LayoutDashboard className="h-4 w-4" />
-                  <span>Dashboard</span>
-                </Link>
+                <Link href="/dashboard"><LayoutDashboard className="h-4 w-4" /><span>Dashboard</span></Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
-          
           </SidebarMenu>
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel>
-            <Star className="h-4 w-4 mr-2" />
-            Starred
-          </SidebarGroupLabel>
-          <SidebarGroupAction title="Add starred playground">
-            <Plus className="h-4 w-4" />
-          </SidebarGroupAction>
+          <SidebarGroupLabel><Star className="h-4 w-4 mr-2" />Starred</SidebarGroupLabel>
+          <SidebarGroupAction title="Add starred playground"><Plus className="h-4 w-4" /></SidebarGroupAction>
           <SidebarGroupContent>
             <SidebarMenu>
-
               {starredPlaygrounds.length === 0 && recentPlaygrounds.length === 0 ? (
-                <div className="text-center text-muted-foreground py-4 w-full">Create your playground</div>
+                <div className="text-center text-muted-foreground py-4 w-full text-xs">Create your playground</div>
               ) : (
                 starredPlaygrounds.map((playground) => {
-                  const IconComponent = lucideIconMap[playground.icon] || Code2;
+                  const Icon = lucideIconMap[playground.icon] || Code2
                   return (
                     <SidebarMenuItem key={playground.id}>
-                      <SidebarMenuButton
-                        asChild
-                        isActive={pathname === `/playground/${playground.id}`}
-                        tooltip={playground.name}
-                      >
-                        <Link href={`/playground/${playground.id}`}>
-                          {IconComponent && <IconComponent className="h-4 w-4" />}
-                          <span>{playground.name}</span>
-                        </Link>
+                      <SidebarMenuButton asChild isActive={pathname === `/playground/${playground.id}`} tooltip={playground.name}>
+                        <Link href={`/playground/${playground.id}`}><Icon className="h-4 w-4" /><span>{playground.name}</span></Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
-                  );
+                  )
                 })
               )}
             </SidebarMenu>
@@ -130,57 +122,109 @@ export function DashboardSidebar({ initialPlaygroundData }: { initialPlaygroundD
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel>
-            <History className="h-4 w-4 mr-2" />
-            Recent
-          </SidebarGroupLabel>
-          <SidebarGroupAction title="Create new playground">
-            <FolderPlus className="h-4 w-4" />
-          </SidebarGroupAction>
+          <SidebarGroupLabel><History className="h-4 w-4 mr-2" />Recent</SidebarGroupLabel>
+          <SidebarGroupAction title="Create new playground"><FolderPlus className="h-4 w-4" /></SidebarGroupAction>
           <SidebarGroupContent>
             <SidebarMenu>
-              {starredPlaygrounds.length === 0 && recentPlaygrounds.length === 0 ? null : (
-                recentPlaygrounds.map((playground) => {
-                  const IconComponent = lucideIconMap[playground.icon] || Code2;
-                  return (
-                    <SidebarMenuItem key={playground.id}>
-                      <SidebarMenuButton
-                        asChild
-                        isActive={pathname === `/playground/${playground.id}`}
-                        tooltip={playground.name}
-                      >
-                        <Link href={`/playground/${playground.id}`}>
-                          {IconComponent && <IconComponent className="h-4 w-4" />}
-                          <span>{playground.name}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  );
-                })
-              )}
+              {recentPlaygrounds.map((playground) => {
+                const Icon = lucideIconMap[playground.icon] || Code2
+                return (
+                  <SidebarMenuItem key={playground.id}>
+                    <SidebarMenuButton asChild isActive={pathname === `/playground/${playground.id}`} tooltip={playground.name}>
+                      <Link href={`/playground/${playground.id}`}><Icon className="h-4 w-4" /><span>{playground.name}</span></Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )
+              })}
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="View all">
-                  <Link href="/playgrounds">
-                    <span className="text-sm text-muted-foreground">View all playgrounds</span>
-                  </Link>
+                  <Link href="/playgrounds"><span className="text-sm text-muted-foreground">View all playgrounds</span></Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter>
+
+      <SidebarFooter className="border-t p-2">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Settings">
-              <Link href="/settings">
-                <Settings className="h-4 w-4" />
-                <span>Settings</span>
-              </Link>
+            <SidebarMenuButton asChild isActive={pathname === "/settings"} tooltip="Settings">
+              <Link href="/settings"><Settings className="h-4 w-4" /><span>Settings</span></Link>
             </SidebarMenuButton>
+          </SidebarMenuItem>
+
+          {/* User profile card */}
+          <SidebarMenuItem>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <SidebarMenuButton
+                  size="lg"
+                  tooltip={user.name || "Profile"}
+                  className="data-[state=open]:bg-sidebar-accent"
+                >
+                  {/* Avatar */}
+                  <div className="h-8 w-8 rounded-full overflow-hidden shrink-0 border border-border">
+                    {user.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={user.image} alt={user.name} width={32} height={32} className="object-cover w-full h-full" />
+                    ) : (
+                      <div className="h-full w-full bg-muted flex items-center justify-center text-sm font-semibold">
+                        {user.name?.[0]?.toUpperCase() ?? "?"}
+                      </div>
+                    )}
+                  </div>
+                  {/* Name + email — hidden when sidebar is collapsed */}
+                  <div className="flex flex-col min-w-0 text-left">
+                    <span className="text-sm font-medium truncate">{user.name}</span>
+                    <span className="text-xs text-muted-foreground truncate">{user.email}</span>
+                  </div>
+                </SidebarMenuButton>
+              </DropdownMenuTrigger>
+
+              <DropdownMenuContent side="top" align="start" className="w-56 mb-1">
+                {/* Profile header */}
+                <div className="flex items-center gap-3 px-3 py-2">
+                  <div className="h-9 w-9 rounded-full overflow-hidden shrink-0 border border-border">
+                    {user.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={user.image} alt={user.name} width={36} height={36} className="object-cover w-full h-full" />
+                    ) : (
+                      <div className="h-full w-full bg-muted flex items-center justify-center text-sm font-semibold">
+                        {user.name?.[0]?.toUpperCase() ?? "?"}
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{user.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                  </div>
+                </div>
+
+                <DropdownMenuSeparator />
+
+                <DropdownMenuItem asChild>
+                  <Link href="/settings" className="cursor-pointer">
+                    <User className="h-4 w-4 mr-2" />
+                    Profile &amp; Settings
+                  </Link>
+                </DropdownMenuItem>
+
+                <DropdownMenuSeparator />
+
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive cursor-pointer"
+                  onClick={() => signOut({ callbackUrl: "/auth/sign-in" })}
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Sign Out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
+
       <SidebarRail />
     </Sidebar>
   )
