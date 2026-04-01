@@ -47,6 +47,7 @@ const MainPlaygroundPage: React.FC = () => {
   // --- 1. Global Stores & Data ---
   const { playgroundData, templateData, isLoading, error, saveTemplateData } =
     usePlayground(id);
+    
   const explorer = useFileExplorer();
   const ai = useAISuggestions();
 

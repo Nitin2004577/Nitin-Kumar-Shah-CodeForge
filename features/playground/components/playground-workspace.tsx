@@ -130,13 +130,14 @@ export const PlaygroundWorkspace: React.FC<PlaygroundWorkspaceProps> = ({
           <>
             <ResizableHandle withHandle />
             <ResizablePanel defaultSize={50} minSize={20}>
+              {/* 🚨 THE FIX: "about:blank" kills the infinite loop 🚨 */}
               <WebContainerPreview
                 templateData={preview.templateData}
                 instance={preview.instance}
                 writeFileSync={preview.writeFileSync || (async () => {})}
                 isLoading={preview.isLoading}
                 error={preview.error}
-                serverUrl={preview.serverUrl || ""}
+                serverUrl={preview.serverUrl || "about:blank"}
                 forceResetup={false}
               />
             </ResizablePanel>
