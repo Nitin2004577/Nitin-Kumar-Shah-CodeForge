@@ -18,41 +18,48 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
   
   // 2. The Grand Unified Callbacks!
   callbacks: {
-    async jwt({ token, user, account }) {
-      // A. Handle OAuth tokens (from your old auth.config.ts)
+    async jwt({ token, user, account, profile }) {
+      // A. Fresh login — account is present
       if (account) {
         token.accessToken = account.access_token;
         token.provider = account.provider;
+
+        // Update the avatar in DB to match the provider just used
+        const freshImage = (profile as any)?.picture   // Google
+                        || (profile as any)?.avatar_url // GitHub
+                        || null;
+
+        if (freshImage && token.sub) {
+          await db.user.update({
+            where: { id: token.sub },
+            data: { image: freshImage },
+          }).catch(() => {}); // silent — don't crash login if this fails
+          token.picture = freshImage;
+        }
       }
 
-      // B. Handle Database User data (from your old auth.ts)
-      if (user) console.log("LOGIN DETECTED:", user.email);
       if (!token.sub) return token;
 
       const existingUser = await getUserById(token.sub);
       if (!existingUser) return token;
 
-      token.name = existingUser.name;
+      token.name  = existingUser.name;
       token.email = existingUser.email;
-      token.role = (existingUser as any).role;
+      token.picture = existingUser.image ?? token.picture;
+      token.role  = (existingUser as any).role;
 
       return token;
     },
-    
-   async session({ session, token }) {
+
+    async session({ session, token }) {
       if (session.user) {
-        // 🚀 The magic trick: tell TS that this specific reference is 'any'
         const customUser = session.user as any;
-        
-        // Attach the ID and Role
-        if (token.sub) {
-          customUser.id = token.sub;
-        }
-        customUser.role = token.role;
-        
-        // Attach the Access Token and Provider
+
+        if (token.sub)       customUser.id          = token.sub;
+        customUser.role      = token.role;
+        customUser.image     = token.picture;        // always in sync with token
         customUser.accessToken = token.accessToken;
-        customUser.provider = token.provider;
+        customUser.provider  = token.provider;
       }
       return session;
     },

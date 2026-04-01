@@ -32,9 +32,5 @@ export const getAccountByUserId = async (userId: string) => {
 
 export const currentUser = async () => {
     const session = await auth();
-    
-    // 🚨 DEBUG LOG: Let's see exactly what NextAuth is returning!
-    console.log("🚨 DEBUG - RAW SESSION FROM NEXTAUTH:", session);
-    
     return session?.user;
 }

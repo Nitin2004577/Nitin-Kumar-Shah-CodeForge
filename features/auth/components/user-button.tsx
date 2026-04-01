@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import { usePathname } from "next/navigation"; // 1. Import the hook
+import { usePathname } from "next/navigation";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,8 +8,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { LogOut, User } from "lucide-react";
 import LogoutButton from "./logout-button";
@@ -17,23 +15,22 @@ import { useCurrentUser } from "../hooks/use-current-user";
 
 const UserButton = () => {
   const user = useCurrentUser();
-  const pathname = usePathname(); // 2. Get the current path
+  const pathname = usePathname();
 
-  // 3. If we are on the Landing Page, return nothing (remove the userButton)
-  if (pathname === "/") {
-    return null;
-  }
+  if (pathname === "/") return null;
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="outline-none">
-        <div className={cn("relative rounded-full")}>
-          <Avatar>
-            <AvatarImage src={user?.image!} alt={user?.name!} />
-            <AvatarFallback className="bg-rose-500">
-              <User className="text-white" />
-            </AvatarFallback>
-          </Avatar>
+        <div className={cn("relative rounded-full w-9 h-9 overflow-hidden border border-border")}>
+          {user?.image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={user.image} alt={user.name ?? "User"} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full bg-rose-500 flex items-center justify-center">
+              <User className="text-white w-4 h-4" />
+            </div>
+          )}
         </div>
       </DropdownMenuTrigger>
 
@@ -41,9 +38,7 @@ const UserButton = () => {
         <DropdownMenuItem className="font-medium">
           <span className="truncate">{user?.email || "User Account"}</span>
         </DropdownMenuItem>
-        
         <DropdownMenuSeparator />
-
         <LogoutButton>
           <DropdownMenuItem className="cursor-pointer text-destructive focus:text-destructive">
             <LogOut className="h-4 w-4 mr-2" />
