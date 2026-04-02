@@ -130,10 +130,44 @@ const TerminalComponent = forwardRef<TerminalRef, TerminalProps>(
       }
 
       try {
-        const shell = await instanceRef.current.spawn("jsh", {
-          terminal: { cols: term.cols, rows: term.rows },
-          env: { TERM: "xterm-256color", COLORTERM: "truecolor", HOME: "/root" },
-        });
+        // Try bash first (available after npm install in most templates)
+        // Fall back to jsh if bash isn't available
+        let shellCmd = "bash";
+        let shellArgs: string[] = ["--norc", "--noprofile"];
+
+        // Write a minimal .bashrc with a clean prompt
+        try {
+          await instanceRef.current.fs.writeFile("/root/.bashrc",
+            `export PS1="\\[\\033[01;32m\\]➜\\[\\033[00m\\] \\[\\033[01;34m\\]\\W\\[\\033[00m\\] \\$ "\n` +
+            `export TERM=xterm-256color\n` +
+            `alias ll='ls -la'\n` +
+            `alias la='ls -A'\n` +
+            `alias l='ls -CF'\n`
+          );
+          shellArgs = ["--rcfile", "/root/.bashrc"];
+        } catch (_) {
+          // fs write failed, use norc
+        }
+
+        let shell: any;
+        try {
+          shell = await instanceRef.current.spawn(shellCmd, shellArgs, {
+            terminal: { cols: term.cols, rows: term.rows },
+            env: {
+              TERM: "xterm-256color",
+              COLORTERM: "truecolor",
+              HOME: "/root",
+              PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/lib/node_modules/.bin:./node_modules/.bin",
+              PS1: "\\[\\033[01;32m\\]➜\\[\\033[00m\\] \\[\\033[01;34m\\]\\W\\[\\033[00m\\] \\$ ",
+            },
+          });
+        } catch (_) {
+          // bash not found, fall back to jsh
+          shell = await instanceRef.current.spawn("jsh", {
+            terminal: { cols: term.cols, rows: term.rows },
+            env: { TERM: "xterm-256color", COLORTERM: "truecolor", HOME: "/root" },
+          });
+        }
         rt.shell = shell;
 
         shell.output.pipeTo(new WritableStream({ write(d: string) { term.write(d); } }));
