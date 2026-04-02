@@ -1,109 +1,81 @@
-import { useState, useEffect, useCallback } from 'react';
-import { toast } from 'sonner';
-import { getPlaygroundById, SaveUpdatedCode } from '../actions';
-import type { TemplateFolder } from '../lib/path-to-json';
+"use client";
 
-interface PlaygroundData {
-  id: string;
-  title?: string;
-  [key: string]: any;
-}
+import { useEffect, useMemo } from "react";
+import { usePlaygroundQuery, useTemplateQuery, useSaveTemplateMutation } from "./queries/usePlaygroundQuery";
+import { useEditorStore } from "../store/useEditorStore";
+import type { TemplateFolder } from "../types";
 
-interface UsePlaygroundReturn {
-  playgroundData: PlaygroundData | null;
-  templateData: TemplateFolder | null;
-  isLoading: boolean;
-  error: string | null;
-  loadPlayground: () => Promise<void>;
-  saveTemplateData: (data: TemplateFolder) => Promise<void>;
-}
+/**
+ * Composes React Query data fetching with the Zustand editor store.
+ * - Server state (playground data, template) → React Query
+ * - Client UI state (open files, active file) → Zustand
+ */
+export function usePlayground(id: string) {
+  const setTemplateData = useEditorStore((s) => s.setTemplateData);
+  const setPlaygroundId = useEditorStore((s) => s.setPlaygroundId);
+  const storeTemplateData = useEditorStore((s) => s.templateData);
 
-export const usePlayground = (id: string): UsePlaygroundReturn => {
-  const [playgroundData, setPlaygroundData] = useState<PlaygroundData | null>(null);
-  const [templateData, setTemplateData] = useState<TemplateFolder | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // 1. Fetch playground metadata from DB
+  const playgroundQuery = usePlaygroundQuery(id);
 
-  const loadPlayground = useCallback(async () => {
-    // 🚨 FIX 1: Catch undefined or invalid IDs immediately
-    if (!id || id === "undefined") {
-      setError("Playground not found. It may have been deleted.");
-      setIsLoading(false);
+  // Determine if there's already a saved template in the DB response
+  const hasSavedTemplate = useMemo(() => {
+    const raw = playgroundQuery.data?.templateFiles?.[0]?.content;
+    return typeof raw === "string" || (raw != null && typeof raw === "object");
+  }, [playgroundQuery.data]);
+
+  // 2. Fetch template JSON from API only if no saved template exists
+  const templateQuery = useTemplateQuery(id, hasSavedTemplate);
+
+  // 3. Save mutation
+  const saveMutation = useSaveTemplateMutation(id);
+
+  // 4. Sync playground ID into store
+  useEffect(() => {
+    if (id) setPlaygroundId(id);
+  }, [id, setPlaygroundId]);
+
+  // 5. Sync template data into Zustand store when it arrives
+  useEffect(() => {
+    if (!playgroundQuery.data) return;
+
+    const raw = playgroundQuery.data.templateFiles?.[0]?.content;
+
+    if (raw != null) {
+      // Parse saved template from DB
+      const parsed: TemplateFolder =
+        typeof raw === "string" ? JSON.parse(raw) : (raw as unknown as TemplateFolder);
+      setTemplateData(parsed);
       return;
     }
 
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      const data = await getPlaygroundById(id);
-      // @ts-ignore
-      setPlaygroundData(data);
-
-      const rawContent = data?.templateFiles?.[0]?.content;
-      if (typeof rawContent === "string") {
-        const parsedContent = JSON.parse(rawContent);
-        setTemplateData(parsedContent);
-        toast.success("Playground loaded successfully");
-        return;
-      }
-
-      // Load template from API if not in saved content
-      const res = await fetch(`/api/template/${id}`);
-      
-      // 🚨 FIX 2: Explicitly catch 404s for deleted data
-      if (res.status === 404) {
-        throw new Error("Playground not found. It may have been deleted.");
-      }
-      
-      if (!res.ok) throw new Error(`Failed to load template: ${res.status}`);
-
-      const templateRes = await res.json();
-      if (templateRes.templateJson && Array.isArray(templateRes.templateJson)) {
-        setTemplateData({
-          folderName: "Root",
-          items: templateRes.templateJson,
-        });
-      } else {
-        setTemplateData(templateRes.templateJson || {
-          folderName: "Root",
-          items: [],
-        });
-      }
-
-      toast.success("Template loaded successfully");
-    } catch (error: any) {
-      console.error("Error loading playground:", error);
-      setError(error.message || "Failed to load playground data");
-      // Optional: Remove the toast error here if you don't want it popping up when a project is deleted
-      toast.error(error.message || "Failed to load playground data"); 
-    } finally {
-      setIsLoading(false);
+    // Fall back to template API response
+    if (templateQuery.data) {
+      setTemplateData(templateQuery.data);
     }
-  }, [id]);
+  }, [playgroundQuery.data, templateQuery.data, setTemplateData]);
 
-  const saveTemplateData = useCallback(async (data: TemplateFolder) => {
-    try {
-      await SaveUpdatedCode(id, data as any);
-      setTemplateData(data);
-      toast.success("Changes saved successfully");
-    } catch (error) {
-      console.error("Error saving template data:", error);
-      toast.error("Failed to save changes");
-      throw error;
-    }
-  }, [id]);
+  const saveTemplateData = async (data: TemplateFolder) => {
+    setTemplateData(data); // Optimistic update
+    await saveMutation.mutateAsync(data);
+  };
 
-  useEffect(() => {
-    loadPlayground();
-  }, [loadPlayground]);
+  const isLoading =
+    playgroundQuery.isLoading ||
+    (!hasSavedTemplate && templateQuery.isLoading);
+
+  const error =
+    playgroundQuery.error?.message ??
+    templateQuery.error?.message ??
+    null;
 
   return {
-    playgroundData,
-    templateData,
+    playgroundData: playgroundQuery.data ?? null,
+    templateData: storeTemplateData,
     isLoading,
     error,
-    loadPlayground,
     saveTemplateData,
+    isSaving: saveMutation.isPending,
+    refetch: playgroundQuery.refetch,
   };
-};
+}

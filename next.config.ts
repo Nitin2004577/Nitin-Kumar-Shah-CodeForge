@@ -3,7 +3,6 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   reactStrictMode: false,
 
-  // Reduce dev server memory usage
   experimental: {
     optimizePackageImports: [
       "lucide-react",
@@ -29,6 +28,9 @@ const nextConfig: NextConfig = {
     ],
   },
 
+  // Empty turbopack config silences the warning — Turbopack works fine without webpack config
+  turbopack: {},
+
   images: {
     remotePatterns: [
       {
@@ -40,39 +42,15 @@ const nextConfig: NextConfig = {
     ],
   },
 
-  // Disable source maps in development to save memory
   productionBrowserSourceMaps: false,
-
-  webpack: (config, { dev, isServer }) => {
-    // Reduce memory usage in dev by limiting parallelism
-    if (dev && !isServer) {
-      config.parallelism = 1;
-    }
-
-    // Monaco editor needs these disabled to bundle correctly
-    config.resolve.fallback = {
-      ...config.resolve.fallback,
-      fs: false,
-      path: false,
-      os: false,
-    };
-
-    return config;
-  },
 
   async headers() {
     return [
       {
         source: "/(.*)",
         headers: [
-          {
-            key: "Cross-Origin-Embedder-Policy",
-            value: "require-corp",
-          },
-          {
-            key: "Cross-Origin-Opener-Policy",
-            value: "same-origin",
-          },
+          { key: "Cross-Origin-Embedder-Policy", value: "require-corp" },
+          { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
         ],
       },
     ];

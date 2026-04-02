@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Poppins } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "../../src/components/providers/theme-provider";
+import { QueryProvider } from "../../src/components/providers/query-provider";
 import { SessionProvider } from "next-auth/react";
 import { auth } from "../../auth";
 import { Toaster } from "@/components/ui/sonner";
@@ -36,10 +37,12 @@ export default async function RootLayout({
         enableSystem
         disableTransitionOnChange
         >
+          <QueryProvider>
             <div className="flex flex-col min-h-screen">
               <Toaster/>
               <div className="flex-1">{children}</div>
             </div>
+          </QueryProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -5,5 +5,12 @@ export default function PlaygroundLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <SidebarProvider>{children}</SidebarProvider>;
+  return (
+    <SidebarProvider
+      style={{ "--sidebar-width": "240px" } as React.CSSProperties}
+      className="overflow-hidden w-screen h-screen"
+    >
+      {children}
+    </SidebarProvider>
+  );
 }
