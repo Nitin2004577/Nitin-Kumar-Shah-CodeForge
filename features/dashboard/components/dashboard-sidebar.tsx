@@ -4,6 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { signOut } from "next-auth/react"
+import { ProxyAvatar } from "@/components/ui/proxy-avatar"
 import {
   Code2,
   Compass,
@@ -165,14 +166,7 @@ export function DashboardSidebar({
                 >
                   {/* Avatar */}
                   <div className="h-8 w-8 rounded-full overflow-hidden shrink-0 border border-border">
-                    {user.image ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={user.image} alt={user.name} width={32} height={32} className="object-cover w-full h-full" />
-                    ) : (
-                      <div className="h-full w-full bg-muted flex items-center justify-center text-sm font-semibold">
-                        {user.name?.[0]?.toUpperCase() ?? "?"}
-                      </div>
-                    )}
+                    <ProxyAvatar src={user.image} alt={user.name} size={32} fallback={user.name?.[0]?.toUpperCase()} />
                   </div>
                   {/* Name + email — hidden when sidebar is collapsed */}
                   <div className="flex flex-col min-w-0 text-left">
@@ -185,15 +179,8 @@ export function DashboardSidebar({
               <DropdownMenuContent side="top" align="start" className="w-56 mb-1">
                 {/* Profile header */}
                 <div className="flex items-center gap-3 px-3 py-2">
-                  <div className="h-9 w-9 rounded-full overflow-hidden shrink-0 border border-border">
-                    {user.image ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={user.image} alt={user.name} width={36} height={36} className="object-cover w-full h-full" />
-                    ) : (
-                      <div className="h-full w-full bg-muted flex items-center justify-center text-sm font-semibold">
-                        {user.name?.[0]?.toUpperCase() ?? "?"}
-                      </div>
-                    )}
+                    <div className="h-9 w-9 rounded-full overflow-hidden shrink-0 border border-border">
+                    <ProxyAvatar src={user.image} alt={user.name} size={36} fallback={user.name?.[0]?.toUpperCase()} />
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm font-medium truncate">{user.name}</p>

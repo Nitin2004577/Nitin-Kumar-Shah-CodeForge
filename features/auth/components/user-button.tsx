@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { LogOut, User } from "lucide-react";
 import LogoutButton from "./logout-button";
 import { useCurrentUser } from "../hooks/use-current-user";
+import { ProxyAvatar } from "@/components/ui/proxy-avatar";
 
 const UserButton = () => {
   const user = useCurrentUser();
@@ -23,14 +24,7 @@ const UserButton = () => {
     <DropdownMenu>
       <DropdownMenuTrigger className="outline-none">
         <div className={cn("relative rounded-full w-9 h-9 overflow-hidden border border-border")}>
-          {user?.image ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={user.image} alt={user.name ?? "User"} className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full bg-rose-500 flex items-center justify-center">
-              <User className="text-white w-4 h-4" />
-            </div>
-          )}
+          <ProxyAvatar src={user?.image} alt={user?.name ?? "User"} size={36} fallback={user?.name?.[0]?.toUpperCase()} />
         </div>
       </DropdownMenuTrigger>
 

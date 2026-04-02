@@ -4,6 +4,7 @@ import { useState } from "react";
 import { signOut } from "next-auth/react";
 import { useTheme } from "next-themes";
 import Link from "next/link";
+import { ProxyAvatar } from "@/components/ui/proxy-avatar";
 import {
   User,
   Palette,
@@ -102,15 +103,8 @@ function ProfileSection({ user }: { user: SettingsUser }) {
 
       {/* Avatar */}
       <div className="flex items-center gap-4">
-        <div className="relative h-20 w-20 rounded-full overflow-hidden border-2 border-border">
-          {user.image ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={user.image} alt={user.name} className="object-cover w-full h-full" />
-          ) : (
-            <div className="h-full w-full bg-muted flex items-center justify-center text-2xl font-bold">
-              {user.name?.[0]?.toUpperCase() ?? "?"}
-            </div>
-          )}
+        <div className="border-2 border-border rounded-full">
+          <ProxyAvatar src={user.image} alt={user.name} size={80} fallback={user.name?.[0]?.toUpperCase()} />
         </div>
         <div>
           <p className="font-medium">{user.name}</p>
