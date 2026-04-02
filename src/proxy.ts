@@ -1,16 +1,19 @@
-import { auth } from "../auth";
+import NextAuth from "next-auth";
+import authConfig from "../auth.config";
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+
+// Use authConfig (no Prisma/DB) so this runs in the Edge runtime
+const { auth } = NextAuth(authConfig);
 
 export default auth((req) => {
-  const { nextUrl, auth: session } = req;
-  const isLoggedIn = !!session;
+  const { nextUrl } = req;
+  const isLoggedIn = !!req.auth;
 
-  const isAuthRoute = nextUrl.pathname.startsWith("/auth");
   const isApiAuthRoute = nextUrl.pathname.startsWith("/api/auth");
+  const isAuthRoute = nextUrl.pathname.startsWith("/auth");
   const isPublicRoute = nextUrl.pathname === "/";
 
-  // Always allow auth API routes through
+  // Always allow NextAuth API routes
   if (isApiAuthRoute) return NextResponse.next();
 
   // Redirect logged-in users away from auth pages
@@ -21,7 +24,7 @@ export default auth((req) => {
     return NextResponse.next();
   }
 
-  // Redirect unauthenticated users to sign-in
+  // Redirect unauthenticated users to sign-in (except public home)
   if (!isLoggedIn && !isPublicRoute) {
     return NextResponse.redirect(new URL("/auth/sign-in", nextUrl));
   }
@@ -31,7 +34,6 @@ export default auth((req) => {
 
 export const config = {
   matcher: [
-    // Skip Next.js internals, static files, and API routes except auth
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
