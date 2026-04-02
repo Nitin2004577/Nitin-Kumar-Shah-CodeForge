@@ -297,7 +297,7 @@ const MainPlaygroundPage: React.FC = () => {
         }
       />
 
-      <SidebarInset>
+      <SidebarInset className="overflow-hidden min-w-0">
         <PlaygroundHeader
           title={playgroundData?.name || "Code Playground"}
           openFilesCount={explorer.openFiles.length}
