@@ -53,6 +53,7 @@ interface TerminalProps {
   webContainerInstance?: any;
   onClose?: () => void;
   theme?: "dark" | "light";
+  projectName?: string;
 }
 
 // Per-tab runtime data stored in a ref (never in state — avoids re-render loops)
@@ -67,7 +68,7 @@ interface TabRuntime {
 }
 
 const TerminalComponent = forwardRef<TerminalRef, TerminalProps>(
-  ({ className, webContainerInstance, onClose }, ref) => {
+  ({ className, webContainerInstance, onClose, projectName = "codeforge" }, ref) => {
     const instanceRef = useRef(webContainerInstance);
     useEffect(() => { instanceRef.current = webContainerInstance; }, [webContainerInstance]);
 
@@ -138,11 +139,13 @@ const TerminalComponent = forwardRef<TerminalRef, TerminalProps>(
         // Write a minimal .bashrc with a clean prompt
         try {
           await instanceRef.current.fs.writeFile("/root/.bashrc",
-            `export PS1="\\[\\033[01;32m\\]➜\\[\\033[00m\\] \\[\\033[01;34m\\]\\W\\[\\033[00m\\] \\$ "\n` +
+            `export PS1="\\[\\033[01;32m\\]➜\\[\\033[00m\\] \\[\\033[01;36m\\]${projectName}\\[\\033[00m\\] \\[\\033[01;34m\\]\\W\\[\\033[00m\\] \\$ "\n` +
             `export TERM=xterm-256color\n` +
+            `export PROJECT_NAME="${projectName}"\n` +
             `alias ll='ls -la'\n` +
             `alias la='ls -A'\n` +
-            `alias l='ls -CF'\n`
+            `alias l='ls -CF'\n` +
+            `cd /\n`
           );
           shellArgs = ["--rcfile", "/root/.bashrc"];
         } catch (_) {
