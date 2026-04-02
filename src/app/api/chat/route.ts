@@ -61,17 +61,18 @@ export async function POST(req: Request) {
     }
 
     // Ensure the API key exists
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.API_KEY;
     if (!apiKey) {
-      console.error("Missing GEMINI_API_KEY environment variable.");
+      console.error("Missing API_KEY environment variable.");
       return NextResponse.json(
         { error: "AI API key not configured on server." },
         { status: 500 }
       );
     }
-    // Call Google Gemini using the OpenAI-compatible endpoint
+
+    // Call Groq — OpenAI-compatible, extremely fast free tier
     const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+      "https://api.groq.com/openai/v1/chat/completions",
       {
         method: "POST",
         headers: {
@@ -79,7 +80,7 @@ export async function POST(req: Request) {
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: "gemini-2.0-flash",
+          model: "llama-3.3-70b-versatile",
           messages: messages,
           temperature: 0.2,
         }),
@@ -88,7 +89,7 @@ export async function POST(req: Request) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`[Gemini API Error] Status ${response.status}:`, errorText);
+      console.error(`[Groq API Error] Status ${response.status}:`, errorText);
 
       if (response.status === 429) {
         return NextResponse.json(
@@ -97,9 +98,15 @@ export async function POST(req: Request) {
         );
       }
 
-      // Return the actual Gemini error message to help debug
+      if (response.status === 403) {
+        return NextResponse.json(
+          { error: "AI service unavailable: invalid or expired API key." },
+          { status: 403 }
+        );
+      }
+
       return NextResponse.json(
-        { error: `Gemini API error (${response.status}): ${errorText}` },
+        { error: `Groq API error (${response.status}): ${errorText}` },
         { status: response.status }
       );
     }
@@ -108,7 +115,7 @@ export async function POST(req: Request) {
     const aiText = data.choices?.[0]?.message?.content;
 
     if (!aiText) {
-      console.error("[Gemini] Unexpected response shape:", JSON.stringify(data));
+      console.error("[Groq] Unexpected response shape:", JSON.stringify(data));
       return NextResponse.json(
         { error: "AI returned an empty response. Please try again." },
         { status: 500 }
@@ -118,7 +125,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       suggestion: aiText,
       response: aiText,
-      model: "gemini-2.0-flash",
+      model: "llama-3.3-70b-versatile",
       tokens: data.usage?.total_tokens || 0,
     });
   } catch (error: any) {
