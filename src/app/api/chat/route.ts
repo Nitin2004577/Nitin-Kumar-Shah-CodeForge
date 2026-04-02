@@ -61,9 +61,9 @@ export async function POST(req: Request) {
     }
 
     // Ensure the API key exists
-    const apiKey = process.env.API_KEY;
+    const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
-      console.error("Missing API_KEY environment variable.");
+      console.error("Missing GROQ_API_KEY environment variable.");
       return NextResponse.json(
         { error: "AI API key not configured on server." },
         { status: 500 }
