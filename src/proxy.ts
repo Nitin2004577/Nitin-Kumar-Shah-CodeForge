@@ -1,36 +1,53 @@
-import NextAuth from "next-auth";
-import authConfig from "../auth.config";
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { getToken } from "next-auth/jwt";
 
-// Use authConfig (no Prisma/DB) so this runs in the Edge runtime
-const { auth } = NextAuth(authConfig);
+export async function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl;
 
-export default auth((req) => {
-  const { nextUrl } = req;
-  const isLoggedIn = !!req.auth;
-
-  const isApiAuthRoute = nextUrl.pathname.startsWith("/api/auth");
-  const isAuthRoute = nextUrl.pathname.startsWith("/auth");
-  const isPublicRoute = nextUrl.pathname === "/";
-
-  // Always allow NextAuth API routes
-  if (isApiAuthRoute) return NextResponse.next();
-
-  // Redirect logged-in users away from auth pages
-  if (isAuthRoute) {
-    if (isLoggedIn) {
-      return NextResponse.redirect(new URL("/dashboard", nextUrl));
-    }
+  // Always pass through NextAuth API routes — never intercept these
+  if (pathname.startsWith("/api/auth")) {
     return NextResponse.next();
   }
 
-  // Redirect unauthenticated users to sign-in (except public home)
-  if (!isLoggedIn && !isPublicRoute) {
-    return NextResponse.redirect(new URL("/auth/sign-in", nextUrl));
+  // Always pass through API routes
+  if (pathname.startsWith("/api/")) {
+    return NextResponse.next();
+  }
+
+  const token = await getToken({
+    req,
+    secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+  });
+
+  const isLoggedIn = !!token;
+  const isAuthPage = pathname.startsWith("/auth");
+  const isPublicPage = pathname === "/";
+
+  // Redirect logged-in users away from auth pages
+  if (isAuthPage && isLoggedIn) {
+    return NextResponse.redirect(new URL("/dashboard", req.url));
+  }
+
+  // Allow auth pages for unauthenticated users
+  if (isAuthPage) {
+    return NextResponse.next();
+  }
+
+  // Allow public home page
+  if (isPublicPage) {
+    return NextResponse.next();
+  }
+
+  // Redirect unauthenticated users to sign-in
+  if (!isLoggedIn) {
+    const signInUrl = new URL("/auth/sign-in", req.url);
+    signInUrl.searchParams.set("callbackUrl", pathname);
+    return NextResponse.redirect(signInUrl);
   }
 
   return NextResponse.next();
-});
+}
 
 export const config = {
   matcher: [
