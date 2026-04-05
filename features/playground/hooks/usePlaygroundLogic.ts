@@ -245,55 +245,27 @@ export const usePlaygroundLogic = (
   // --- 6. Save Logic (DEBUG MODE) ---
   const handleSave = useCallback(
     async (fileId?: string) => {
-      console.log("🔍 DEBUG 1: Save function triggered!");
-      
       const targetFileId = fileId || explorer.activeFileId;
-      console.log("🔍 DEBUG 2: Target File ID is:", targetFileId);
-      if (!targetFileId) {
-        console.log("🛑 STOPPING: No active file ID found.");
-        return;
-      }
+      if (!targetFileId) return;
 
       const fileToSave = explorer.openFiles.find((f) => f.id === targetFileId);
-      console.log("🔍 DEBUG 3: File object found:", fileToSave?.filename);
-      if (!fileToSave) {
-        console.log("🛑 STOPPING: Could not find the file object in openFiles.");
-        return;
-      }
+      if (!fileToSave) return;
 
-      // Using getState() to get the absolute latest from Zustand
       const latestData = useFileExplorer.getState().templateData;
-      console.log("🔍 DEBUG 4: Latest template data exists:", !!latestData);
-      if (!latestData) {
-        console.log("🛑 STOPPING: No templateData found in the store.");
-        return;
-      }
+      if (!latestData) return;
 
       try {
         const filePath = findFilePath(fileToSave, latestData);
-        console.log("🔍 DEBUG 5: Calculated File Path:", filePath);
-        
-        if (!filePath) {
-          console.error("🛑 STOPPING: findFilePath returned undefined/null.");
-          throw new Error("File path not found");
-        }
+        if (!filePath) throw new Error("File path not found");
 
         const updatedData = JSON.parse(JSON.stringify(latestData));
         const lastContent = lastSyncedContent.current.get(fileToSave.id);
 
-        console.log("🔍 DEBUG 6: Content changed?", lastContent !== fileToSave.content);
-
-        // Sync to WebContainer
         if (lastContent !== fileToSave.content) {
-          console.log("🔍 DEBUG 7: Attempting to write to WebContainer...");
           await writeFileSync(filePath, fileToSave.content);
           lastSyncedContent.current.set(fileToSave.id, fileToSave.content);
-        } else {
-           console.log("⏩ SKIPPING WRITE: File content hasn't changed since last save.");
         }
 
-        // Save to DB
-        console.log("🔍 DEBUG 8: Saving to database/state...");
         const newData = await saveTemplateData(updatedData);
         if (newData) explorer.setTemplateData(newData);
 
@@ -305,12 +277,9 @@ export const usePlaygroundLogic = (
           )
         );
 
-        toast.success(
-          `Saved ${fileToSave.filename}.${fileToSave.fileExtension}`
-        );
-        console.log("✅ DEBUG 9: Save complete!");
+        toast.success(`Saved ${fileToSave.filename}.${fileToSave.fileExtension}`);
       } catch (err) {
-        console.error("❌ DEBUG ERROR: Failed during the save process:", err);
+        console.error("Save failed:", err);
         toast.error("Failed to save file");
       }
     },
