@@ -41,23 +41,31 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
 
       // B. Only hit DB on first load (user object present) or when token has no role yet
       if (user || !token.role) {
-        const existingUser = await getUserById(token.sub);
-        if (existingUser) {
-          token.name    = existingUser.name;
-          token.email   = existingUser.email;
-          token.picture = existingUser.image ?? token.picture;
-          token.role    = (existingUser as any).role;
+        try {
+          const existingUser = await getUserById(token.sub);
+          if (existingUser) {
+            token.name    = existingUser.name;
+            token.email   = existingUser.email;
+            token.picture = existingUser.image ?? token.picture;
+            token.role    = (existingUser as any).role;
+          }
+        } catch (_) {
+          // DB unavailable — keep existing token data, don't drop session
         }
       }
 
       // C. If provider is github but accessToken is missing, fetch from DB Account
       if (token.provider === "github" && !token.accessToken) {
-        const account = await db.account.findFirst({
-          where: { userId: token.sub, provider: "github" },
-          select: { access_token: true },
-        });
-        if (account?.access_token) {
-          token.accessToken = account.access_token;
+        try {
+          const dbAccount = await db.account.findFirst({
+            where: { userId: token.sub, provider: "github" },
+            select: { access_token: true },
+          });
+          if (dbAccount?.access_token) {
+            token.accessToken = dbAccount.access_token;
+          }
+        } catch (_) {
+          // DB unavailable — continue without token
         }
       }
 

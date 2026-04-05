@@ -18,6 +18,10 @@ export async function proxy(req: NextRequest) {
   const token = await getToken({
     req,
     secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+    // NextAuth v5 uses "authjs.session-token" in production, "next-auth.session-token" in dev
+    cookieName: process.env.NODE_ENV === "production"
+      ? "__Secure-authjs.session-token"
+      : "authjs.session-token",
   });
 
   const isLoggedIn = !!token;
