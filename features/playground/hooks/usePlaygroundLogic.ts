@@ -266,6 +266,25 @@ export const usePlaygroundLogic = (
           lastSyncedContent.current.set(fileToSave.id, fileToSave.content);
         }
 
+        // Patch the edited file's content into the tree snapshot before saving to DB.
+        // Without this, saveTemplateData sends stale content from the last sync.
+        const patchFileInTree = (node: any): boolean => {
+          if (!node?.items) return false;
+          for (const item of node.items) {
+            if ("folderName" in item) {
+              if (patchFileInTree(item)) return true;
+            } else if (
+              item.filename === fileToSave.filename &&
+              item.fileExtension === fileToSave.fileExtension
+            ) {
+              item.content = fileToSave.content;
+              return true;
+            }
+          }
+          return false;
+        };
+        patchFileInTree(updatedData);
+
         const newData = await saveTemplateData(updatedData);
         if (newData) explorer.setTemplateData(newData);
 
