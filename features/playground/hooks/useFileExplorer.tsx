@@ -476,11 +476,12 @@ export const useFileExplorer = create<FileExplorerState>()(
     }),
     {
       name: "playground-file-explorer-storage",
+      // Only persist lightweight UI state — never file contents.
+      // Persisting templateData/openFiles causes ERR_INSUFFICIENT_RESOURCES
+      // because it serializes the entire file tree on every keystroke.
       partialize: (state) => ({
-        templateData: state.templateData,
-        openFiles: state.openFiles,
         activeFileId: state.activeFileId,
-        editorContent: state.editorContent,
+        playgroundId: state.playgroundId,
       }),
     }
   )

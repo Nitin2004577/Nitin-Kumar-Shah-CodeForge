@@ -1,45 +1,60 @@
-import NextAuth from "next-auth";
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { getToken } from "next-auth/jwt";
 
-import {
-  DEFAULT_LOGIN_REDIRECT,
-  apiAuthPrefix,
-  publicRoutes,
-  authRoutes,
-} from "../routes";
-import authConfig from "../auth.config";
+export async function proxy(req: NextRequest) {
+  const { pathname } = req.nextUrl;
 
-const { auth } = NextAuth(authConfig);
-
-// 1. Export as 'proxy' instead of 'default' for Next.js 16+
-export const proxy = auth((req) => {
-  const { nextUrl } = req;
-  const isLoggedIn = !!req.auth;
-
-  const isApiAuthRoute = nextUrl.pathname.startsWith(apiAuthPrefix);
-  const isPublicRoute = publicRoutes.includes(nextUrl.pathname);
-  const isAuthRoute = authRoutes.includes(nextUrl.pathname);
-
-  if (isApiAuthRoute) {
-    return; 
+  // Always pass through NextAuth API routes — never intercept these
+  if (pathname.startsWith("/api/auth")) {
+    return NextResponse.next();
   }
 
-  if (isAuthRoute) {
-    if (isLoggedIn) {
-      return NextResponse.redirect(new URL(DEFAULT_LOGIN_REDIRECT, nextUrl));
-    }
-    return;
+  // Always pass through API routes
+  if (pathname.startsWith("/api/")) {
+    return NextResponse.next();
   }
 
-  if (!isLoggedIn && !isPublicRoute) {
-    return NextResponse.redirect(new URL("/auth/sign-in", nextUrl));
+  const token = await getToken({
+    req,
+    secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+    // NextAuth v5 uses "authjs.session-token" in production, "next-auth.session-token" in dev
+    cookieName: process.env.NODE_ENV === "production"
+      ? "__Secure-authjs.session-token"
+      : "authjs.session-token",
+  });
+
+  const isLoggedIn = !!token;
+  const isAuthPage = pathname.startsWith("/auth");
+  const isPublicPage = pathname === "/";
+
+  // Redirect logged-in users away from auth pages
+  if (isAuthPage && isLoggedIn) {
+    return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
-  return;
-});
+  // Allow auth pages for unauthenticated users
+  if (isAuthPage) {
+    return NextResponse.next();
+  }
 
-// 2. The matcher config stays exactly the same
+  // Allow public home page
+  if (isPublicPage) {
+    return NextResponse.next();
+  }
+
+  // Redirect unauthenticated users to sign-in
+  if (!isLoggedIn) {
+    const signInUrl = new URL("/auth/sign-in", req.url);
+    signInUrl.searchParams.set("callbackUrl", pathname);
+    return NextResponse.redirect(signInUrl);
+  }
+
+  return NextResponse.next();
+}
+
 export const config = {
-  // copied from clerk
-  matcher: ["/((?!.+\\.[\\w]+$|_next).*)", "/", "/(api|trpc)(.*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+  ],
 };

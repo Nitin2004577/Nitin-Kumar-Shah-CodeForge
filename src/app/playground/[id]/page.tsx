@@ -299,7 +299,7 @@ const MainPlaygroundPage: React.FC = () => {
 
       <SidebarInset className="overflow-hidden min-w-0">
         <PlaygroundHeader
-          title={playgroundData?.name || "Code Playground"}
+          title={playgroundData?.title || "Code Playground"}
           openFilesCount={explorer.openFiles.length}
           hasUnsavedChanges={hasUnsaved}
           canSave={!!activeFile && activeFile.hasUnsavedChanges}
