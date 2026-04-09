@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import type { TemplateFolder } from "@/../../features/playground/lib/path-to-json";
 import { transformToWebContainerFormat } from "../hooks/transformer";
-import { CheckCircle, Loader2, XCircle } from "lucide-react";
+import { CheckCircle, Loader2, Play, XCircle } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { WebContainer } from "@webcontainer/api";
 
@@ -15,8 +15,9 @@ interface WebContainerPreviewProps {
   instance: WebContainer | null;
   writeFileSync: (path: string, content: string) => Promise<void>;
   forceResetup?: boolean;
-  // ✨ NEW: We accept the terminal ref from the parent layout!
-  terminalRef?: React.MutableRefObject<any>; 
+  terminalRef?: React.MutableRefObject<any>;
+  // Manual run gate — preview only starts when this is true
+  hasRun?: boolean;
 }
 
 const WebContainerPreview: React.FC<WebContainerPreviewProps> = ({
@@ -28,6 +29,7 @@ const WebContainerPreview: React.FC<WebContainerPreviewProps> = ({
   writeFileSync,
   forceResetup = false,
   terminalRef,
+  hasRun = false,
 }) => {
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const [loadingState, setLoadingState] = useState({
@@ -71,7 +73,7 @@ const WebContainerPreview: React.FC<WebContainerPreviewProps> = ({
 
   useEffect(() => {
     async function setupContainer() {
-      if (!instance || !isTerminalReady || isSetupComplete || isSetupInProgress) return;
+      if (!instance || !isTerminalReady || isSetupComplete || isSetupInProgress || !hasRun) return;
 
       const getStartCommand = async () => {
         try {
@@ -264,7 +266,7 @@ const WebContainerPreview: React.FC<WebContainerPreviewProps> = ({
     }
 
     setupContainer();
-  }, [instance, templateData, isSetupComplete, isSetupInProgress, isTerminalReady, terminalRef]);
+  }, [instance, templateData, isSetupComplete, isSetupInProgress, isTerminalReady, terminalRef, hasRun]);
 
   useEffect(() => {
     return () => {
@@ -320,7 +322,20 @@ const WebContainerPreview: React.FC<WebContainerPreviewProps> = ({
 
   return (
     <div className="h-full w-full flex flex-col bg-[#1e1e1e]">
-      {!previewUrl ? (
+      {/* Not yet run — show idle prompt */}
+      {!hasRun && !previewUrl && (
+        <div className="h-full flex items-center justify-center">
+          <div className="text-center space-y-3">
+            <div className="flex items-center justify-center w-16 h-16 rounded-full bg-green-500/10 mx-auto">
+              <Play className="h-7 w-7 text-green-400 ml-1" />
+            </div>
+            <p className="text-sm text-zinc-400">Press <span className="text-white font-medium">Run</span> in the header to start the preview</p>
+          </div>
+        </div>
+      )}
+
+      {/* Running but not ready yet — show progress */}
+      {hasRun && !previewUrl && (
         <div className="h-full flex items-center justify-center">
           <div className="w-full max-w-md p-6 rounded-lg bg-white dark:bg-zinc-800 shadow-sm mx-auto">
             <Progress value={(currentStep / totalSteps) * 100} className="h-2 mb-6" />
@@ -332,7 +347,10 @@ const WebContainerPreview: React.FC<WebContainerPreviewProps> = ({
             </div>
           </div>
         </div>
-      ) : (
+      )}
+
+      {/* Preview ready */}
+      {previewUrl && (
         <div className="h-full w-full">
           <iframe src={previewUrl} className="w-full h-full border-none bg-white" title="WebContainer Preview" />
         </div>

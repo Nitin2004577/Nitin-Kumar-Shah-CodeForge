@@ -37,6 +37,7 @@ interface PlaygroundWorkspaceProps {
     isLoading: boolean;
     error: string | null;
     writeFileSync?: (path: string, content: string) => Promise<void>;
+    hasRun?: boolean;
   };
 }
 
@@ -139,6 +140,7 @@ export const PlaygroundWorkspace: React.FC<PlaygroundWorkspaceProps> = ({
                 error={preview.error}
                 serverUrl={preview.serverUrl || "about:blank"}
                 forceResetup={false}
+                hasRun={preview.hasRun}
               />
             </ResizablePanel>
           </>
