@@ -312,6 +312,11 @@ const MainPlaygroundPage: React.FC = () => {
           onCloseAll={explorer.closeAllFiles}
           onGitPush={() => setIsGitModalOpen(true)}
           isPushing={isPushing}
+          onRun={logic.handleRun}
+          isRunning={logic.isRunning}
+          hasRun={logic.hasRun}
+          isAutoSaveEnabled={logic.isAutoSaveEnabled}
+          onToggleAutoSave={logic.toggleAutoSave}
           aiProps={
             {
               isEnabled: ai.isEnabled,
@@ -422,6 +427,7 @@ const MainPlaygroundPage: React.FC = () => {
                   error: logic.containerError,
                   writeFileSync: logic.writeFileSync,
                   terminalRef: terminalRef,
+                  hasRun: logic.hasRun,
                 } as any
               }
             />
