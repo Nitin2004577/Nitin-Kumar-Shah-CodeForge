@@ -153,12 +153,6 @@ export const EnhancedCodeBlock: React.FC<EnhancedCodeBlockProps> = ({
     );
   };
 
-  const handleFeedback = (type: "up" | "down") => {
-    setFeedback(type);
-    // Here you could send feedback to your analytics service
-    console.log(`Code block feedback: ${type}`);
-  };
-
   if (inline) {
     return (
       <code className="bg-zinc-800/60 text-zinc-200 px-1.5 py-0.5 rounded text-sm font-mono border border-zinc-700/50">
