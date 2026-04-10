@@ -167,10 +167,7 @@ export const EnhancedCodeBlock: React.FC<EnhancedCodeBlockProps> = ({
   return (
     <TooltipProvider>
       <div
-        className={cn(
-          "relative group my-4",
-          isFullscreen && "fixed inset-4 z-50 bg-zinc-950 rounded-lg"
-        )}
+        className="relative group my-4"
       >
         {/* Header with enhanced controls */}
         <div className="flex items-center justify-between bg-zinc-800/90 backdrop-blur-sm px-4 py-2.5 rounded-t-lg border border-zinc-700/50">
