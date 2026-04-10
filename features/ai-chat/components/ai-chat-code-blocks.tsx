@@ -261,11 +261,7 @@ export const EnhancedCodeBlock: React.FC<EnhancedCodeBlockProps> = ({
               fontSize: "13px",
               fontFamily:
                 "'JetBrains Mono', 'Fira Code', 'SF Mono', 'Monaco', 'Cascadia Code', 'Roboto Mono', monospace",
-              maxHeight: isFullscreen
-                ? "calc(100vh - 120px)"
-                : collapsed
-                ? "200px"
-                : `${maxHeight}px`,
+              maxHeight: collapsed ? "200px" : `${maxHeight}px`,
               overflow: "auto",
             }}
             lineNumberStyle={{
