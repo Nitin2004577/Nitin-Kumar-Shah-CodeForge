@@ -74,6 +74,7 @@ import { useResponsive } from "../hooks/use-responsive";
 
 interface AIChatSidePanelProps {
   isOpen: boolean;
+  inline?: boolean;
   onClose: () => void;
   onInsertCode?: (
     code: string,
@@ -90,6 +91,7 @@ interface AIChatSidePanelProps {
 
 export const AIChatSidePanel: React.FC<AIChatSidePanelProps> = ({
   isOpen,
+  inline = false,
   onClose,
   onInsertCode,
   onRunCode,
@@ -442,20 +444,26 @@ export const AIChatSidePanel: React.FC<AIChatSidePanelProps> = ({
   return (
     <TooltipProvider>
       <>
-        {/* Backdrop */}
-        <div
-          className={cn(
-            "fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-opacity duration-300",
-            isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
-          )}
-          onClick={onClose}
-        />
+        {/* Backdrop — only in overlay mode */}
+        {!inline && (
+          <div
+            className={cn(
+              "fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-opacity duration-300",
+              isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+            )}
+            onClick={onClose}
+          />
+        )}
 
-        {/* Side Panel */}
+        {/* Panel — fixed overlay OR inline fill */}
         <div
           className={cn(
-            "fixed right-0 top-0 h-full w-full max-w-[450px] bg-zinc-950 border-l border-zinc-800 z-50 flex flex-col transition-transform duration-300 ease-out shadow-2xl",
-            isOpen ? "translate-x-0" : "translate-x-full"
+            inline
+              ? "flex flex-col h-full w-full bg-zinc-950"
+              : cn(
+                  "fixed right-0 top-0 h-full w-full max-w-[450px] bg-zinc-950 border-l border-zinc-800 z-50 flex flex-col transition-transform duration-300 ease-out shadow-2xl",
+                  isOpen ? "translate-x-0" : "translate-x-full"
+                )
           )}
           onDrop={handleDrop}
           onDragOver={(e) => {
@@ -465,21 +473,21 @@ export const AIChatSidePanel: React.FC<AIChatSidePanelProps> = ({
           onDragLeave={() => setDragOver(false)}
         >
           {/* 1. HEADER */}
-          <div className="p-4 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/50">
+          <div className="p-3 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/50 shrink-0">
             <div className="flex items-center gap-2">
-              <div className="p-2 bg-purple-500/10 rounded-lg">
-                <Bot className="w-5 h-5 text-purple-400" />
+              <div className="p-1.5 bg-purple-500/10 rounded-lg">
+                <Bot className="w-4 h-4 text-purple-400" />
               </div>
               <div>
                 <h2 className="text-sm font-semibold text-zinc-100">
                   AI Assistant
                 </h2>
                 <div className="flex items-center gap-1.5">
-                  <span className="relative flex h-2 w-2">
+                  <span className="relative flex h-1.5 w-1.5">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
                   </span>
-                  <span className="text-[10px] text-zinc-400 uppercase tracking-wider font-medium">
+                  <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">
                     Online
                   </span>
                 </div>
@@ -489,31 +497,31 @@ export const AIChatSidePanel: React.FC<AIChatSidePanelProps> = ({
               variant="ghost"
               size="icon"
               onClick={onClose}
-              className="text-zinc-400 hover:text-white"
+              className="h-7 w-7 text-zinc-500 hover:text-white"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </Button>
           </div>
 
           {/* 2. CHAT MODES (Tabs) */}
-          <div className="px-2 py-2 border-b border-zinc-800 bg-zinc-900/30">
+          <div className="px-2 py-1.5 border-b border-zinc-800 bg-zinc-900/30 shrink-0">
             <Tabs
               value={chatMode}
               onValueChange={(v: any) => setChatMode(v)}
               className="w-full"
             >
-              <TabsList className="grid grid-cols-4 bg-zinc-900 h-8">
-                <TabsTrigger value="chat" className="text-[10px]">
-                  Chat
+              <TabsList className="grid grid-cols-4 bg-zinc-900 h-7">
+                <TabsTrigger value="chat" className="text-[10px] gap-1">
+                  <MessageSquare className="w-3 h-3" /> Chat
                 </TabsTrigger>
-                <TabsTrigger value="review" className="text-[10px]">
-                  Review
+                <TabsTrigger value="review" className="text-[10px] gap-1">
+                  <Brain className="w-3 h-3" /> Review
                 </TabsTrigger>
-                <TabsTrigger value="fix" className="text-[10px]">
-                  Fix
+                <TabsTrigger value="fix" className="text-[10px] gap-1">
+                  <Zap className="w-3 h-3" /> Fix
                 </TabsTrigger>
-                <TabsTrigger value="optimize" className="text-[10px]">
-                  Opt
+                <TabsTrigger value="optimize" className="text-[10px] gap-1">
+                  <Terminal className="w-3 h-3" /> Optimize
                 </TabsTrigger>
               </TabsList>
             </Tabs>
@@ -626,7 +634,7 @@ export const AIChatSidePanel: React.FC<AIChatSidePanelProps> = ({
           )}
 
           {/* 5. INPUT AREA */}
-          <div className="p-4 bg-zinc-900/80 border-t border-zinc-800">
+          <div className="p-3 bg-zinc-900/80 border-t border-zinc-800 shrink-0">
             <form onSubmit={handleSendMessage} className="relative">
               <Textarea
                 value={input}
@@ -643,7 +651,7 @@ export const AIChatSidePanel: React.FC<AIChatSidePanelProps> = ({
                     ? `Ask about ${activeFileName}...`
                     : "Ask AI anything..."
                 }
-                className="min-h-[100px] w-full bg-zinc-950 border-zinc-800 focus:border-purple-500 resize-none pr-12 pb-10 text-sm"
+                className="min-h-[80px] w-full bg-zinc-950 border-zinc-800 focus:border-purple-500/50 resize-none pr-10 pb-9 text-sm placeholder:text-zinc-600"
               />
 
               <div className="absolute left-2 bottom-2 flex items-center gap-1">
@@ -653,13 +661,13 @@ export const AIChatSidePanel: React.FC<AIChatSidePanelProps> = ({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 text-zinc-500"
+                      className="h-7 w-7 text-zinc-600 hover:text-zinc-300"
                       onClick={() => fileInputRef.current?.click()}
                     >
-                      <Paperclip className="w-4 h-4" />
+                      <Paperclip className="w-3.5 h-3.5" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>Attach File</TooltipContent>
+                  <TooltipContent>Attach file</TooltipContent>
                 </Tooltip>
 
                 <Tooltip>
@@ -668,23 +676,27 @@ export const AIChatSidePanel: React.FC<AIChatSidePanelProps> = ({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 text-zinc-500"
+                      className="h-7 w-7 text-zinc-600 hover:text-zinc-300"
                       onClick={addCurrentFileAsContext}
                     >
-                      <FileText className="w-4 h-4" />
+                      <FileText className="w-3.5 h-3.5" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>Add Active File</TooltipContent>
+                  <TooltipContent>Add active file as context</TooltipContent>
                 </Tooltip>
               </div>
 
               <Button
                 type="submit"
                 disabled={!input.trim() || isLoading}
-                className="absolute right-2 bottom-2 h-8 w-8 bg-purple-600 hover:bg-purple-500 text-white"
+                className="absolute right-2 bottom-2 h-7 w-7 bg-purple-600 hover:bg-purple-500 text-white disabled:opacity-40"
                 size="icon"
               >
-                <Send className="w-4 h-4" />
+                {isLoading ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Send className="w-3.5 h-3.5" />
+                )}
               </Button>
             </form>
             <input

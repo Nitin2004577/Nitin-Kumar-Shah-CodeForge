@@ -127,8 +127,8 @@ export const PlaygroundHeader: React.FC<PlaygroundHeaderProps> = ({
           isEnabled={aiProps.isEnabled}
           onToggle={aiProps.onToggle}
           suggestionLoading={aiProps.isLoading}
-          activeFeature={aiProps.isLoading ? "Generating..." : undefined}
-          loadingProgress={aiProps.isLoading ? 65 : 0}
+          isChatOpen={aiProps.isChatOpen}
+          onToggleChat={aiProps.onToggleChat}
         />
 
         <AISettingsDropdown

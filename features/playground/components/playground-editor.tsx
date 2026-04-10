@@ -13,6 +13,7 @@ interface PlaygroundEditorProps {
   content: string;
   onContentChange: (value: string) => void;
   onSave: (content: string) => void;
+  onEditorMount?: (editor: any, monaco: any) => void;
   suggestion: string | null;
   suggestionLoading: boolean;
   suggestionPosition: { line: number; column: number } | null;
@@ -33,6 +34,7 @@ export const PlaygroundEditor = ({
   content,
   onContentChange,
   onSave,
+  onEditorMount,
   suggestion,
   suggestionLoading,
   suggestionPosition,
@@ -130,6 +132,7 @@ export const PlaygroundEditor = ({
   const handleEditorDidMount = (editor: any, monaco: Monaco) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
+    onEditorMount?.(editor, monaco);
 
     configureMonaco(monaco);
 

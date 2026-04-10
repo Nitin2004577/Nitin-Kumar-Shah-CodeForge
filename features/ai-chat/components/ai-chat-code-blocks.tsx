@@ -3,21 +3,12 @@
 import type React from "react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Copy,
   Check,
-  Download,
-  Eye,
-  EyeOff,
   MoreHorizontal,
-  Play,
   FileText,
-  Maximize2,
-  Minimize2,
   ImportIcon as Insert,
-  ThumbsUp,
-  ThumbsDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
@@ -31,13 +22,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
 interface EnhancedCodeBlockProps {
   children: string;
@@ -64,9 +48,6 @@ export const EnhancedCodeBlock: React.FC<EnhancedCodeBlockProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
-  const [showNumbers, setShowNumbers] = useState(showLineNumbers);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [feedback, setFeedback] = useState<"up" | "down" | null>(null);
 
   const match = /language-(\w+)/.exec(className || "");
   const language = match ? match[1] : "text";
@@ -219,123 +200,23 @@ export const EnhancedCodeBlock: React.FC<EnhancedCodeBlockProps> = ({
           </div>
 
           <div className="flex items-center gap-1">
-            {/* Feedback buttons */}
-            <div className="flex items-center gap-1 mr-2">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={cn(
-                      "h-7 w-7 p-0 transition-colors",
-                      feedback === "up"
-                        ? "text-green-400 hover:text-green-300"
-                        : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700/50"
-                    )}
-                    onClick={() => handleFeedback("up")}
-                  >
-                    <ThumbsUp className="h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Helpful code</TooltipContent>
-              </Tooltip>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={cn(
-                      "h-7 w-7 p-0 transition-colors",
-                      feedback === "down"
-                        ? "text-red-400 hover:text-red-300"
-                        : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700/50"
-                    )}
-                    onClick={() => handleFeedback("down")}
-                  >
-                    <ThumbsDown className="h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Not helpful</TooltipContent>
-              </Tooltip>
-            </div>
-
             {shouldShowControls && (
-              <>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 w-7 p-0 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700/50 transition-colors"
-                      onClick={() => setShowNumbers(!showNumbers)}
-                    >
-                      {showNumbers ? (
-                        <EyeOff className="h-3.5 w-3.5" />
-                      ) : (
-                        <Eye className="h-3.5 w-3.5" />
-                      )}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    {showNumbers ? "Hide line numbers" : "Show line numbers"}
-                  </TooltipContent>
-                </Tooltip>
-
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 w-7 p-0 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700/50 transition-colors"
-                      onClick={() => setIsFullscreen(!isFullscreen)}
-                    >
-                      {isFullscreen ? (
-                        <Minimize2 className="h-3.5 w-3.5" />
-                      ) : (
-                        <Maximize2 className="h-3.5 w-3.5" />
-                      )}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    {isFullscreen ? "Exit fullscreen" : "Fullscreen"}
-                  </TooltipContent>
-                </Tooltip>
-
-                {lineCount > 20 && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 w-7 p-0 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700/50 transition-colors"
-                        onClick={() => setCollapsed(!collapsed)}
-                      >
-                        <MoreHorizontal className="h-3.5 w-3.5" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      {collapsed ? "Expand code" : "Collapse code"}
-                    </TooltipContent>
-                  </Tooltip>
-                )}
-              </>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700/50 transition-colors"
+                    onClick={() => setCollapsed(!collapsed)}
+                  >
+                    <MoreHorizontal className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {collapsed ? "Expand code" : "Collapse code"}
+                </TooltipContent>
+              </Tooltip>
             )}
-
-            {/* Action buttons */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 w-7 p-0 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700/50 transition-colors"
-                  onClick={downloadCode}
-                >
-                  <Download className="h-3.5 w-3.5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Download code</TooltipContent>
-            </Tooltip>
 
             {onInsert && (
               <Tooltip>
@@ -343,29 +224,14 @@ export const EnhancedCodeBlock: React.FC<EnhancedCodeBlockProps> = ({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-7 w-7 p-0 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 transition-colors"
+                    className="h-7 px-2 gap-1 text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 transition-colors text-[10px] font-medium"
                     onClick={() => onInsert(children)}
                   >
                     <Insert className="h-3.5 w-3.5" />
+                    Insert
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Insert into editor</TooltipContent>
-              </Tooltip>
-            )}
-
-            {isExecutable(language) && onRun && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 w-7 p-0 text-green-400 hover:text-green-300 hover:bg-green-500/10 transition-colors"
-                    onClick={() => onRun(children, language)}
-                  >
-                    <Play className="h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Run code</TooltipContent>
               </Tooltip>
             )}
 
@@ -384,38 +250,8 @@ export const EnhancedCodeBlock: React.FC<EnhancedCodeBlockProps> = ({
                   )}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Copy code</TooltipContent>
+              <TooltipContent>{copied ? "Copied!" : "Copy"}</TooltipContent>
             </Tooltip>
-
-            {/* More options dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 w-7 p-0 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700/50 transition-colors"
-                >
-                  <MoreHorizontal className="h-3.5 w-3.5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setCollapsed(!collapsed)}>
-                  {collapsed ? "Expand" : "Collapse"} Code
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setShowNumbers(!showNumbers)}>
-                  {showNumbers ? "Hide" : "Show"} Line Numbers
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={downloadCode}>
-                  Download as File
-                </DropdownMenuItem>
-                {onInsert && (
-                  <DropdownMenuItem onClick={() => onInsert(children)}>
-                    Insert into Editor
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
           </div>
         </div>
 
