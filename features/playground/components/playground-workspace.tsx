@@ -9,13 +9,18 @@ import {
 
 import { PlaygroundEditor } from "@/../features/playground/components/playground-editor";
 import WebContainerPreview from "@/../features/webcontianers/components/webcontainer-preveiw";
+import { AIChatSidePanel } from "@/../features/ai-chat/components/ai-chat-sidepanel";
 import { TemplateFile } from "@/../features/playground/types";
 import { WebContainer } from "@webcontainer/api";
 
 interface PlaygroundWorkspaceProps {
   activeFile?: TemplateFile | undefined;
   isPreviewVisible: boolean;
+  isChatOpen?: boolean;
+  onChatClose?: () => void;
   onContentChange: (value: string | undefined) => void;
+  editorRef?: React.MutableRefObject<any>;
+  monacoRef?: React.MutableRefObject<any>;
   ai: {
     suggestion: string;
     isLoading: boolean;
@@ -44,11 +49,19 @@ interface PlaygroundWorkspaceProps {
 export const PlaygroundWorkspace: React.FC<PlaygroundWorkspaceProps> = ({
   activeFile,
   isPreviewVisible,
+  isChatOpen = false,
+  onChatClose,
   onContentChange,
+  editorRef: externalEditorRef,
+  monacoRef: externalMonacoRef,
   ai,
   preview,
 }) => {
   const lastLoadedFileId = useRef<string | null>(null);
+  const internalEditorRef = useRef<any>(null);
+  const internalMonacoRef = useRef<any>(null);
+  const editorRef = externalEditorRef ?? internalEditorRef;
+  const monacoRef = externalMonacoRef ?? internalMonacoRef;
 
   // --- PERSISTENCE LOGIC ---
   useEffect(() => {
@@ -89,6 +102,27 @@ export const PlaygroundWorkspace: React.FC<PlaygroundWorkspaceProps> = ({
     }
   };
 
+  const handleInsertCode = (code: string) => {
+    const editor = editorRef.current;
+    const monaco = monacoRef.current;
+    if (!editor || !monaco) return;
+    const position = editor.getPosition();
+    if (!position) return;
+    editor.executeEdits("ai-insert", [
+      {
+        range: new monaco.Range(
+          position.lineNumber,
+          position.column,
+          position.lineNumber,
+          position.column
+        ),
+        text: code,
+        forceMoveMarkers: true,
+      },
+    ]);
+    editor.focus();
+  };
+
   if (!activeFile) {
     return (
       <div className="flex flex-col h-full items-center justify-center text-muted-foreground gap-4 bg-muted/10">
@@ -103,49 +137,73 @@ export const PlaygroundWorkspace: React.FC<PlaygroundWorkspaceProps> = ({
     );
   }
 
-  return (
-    <div className="flex-1 overflow-hidden h-full">
-      <ResizablePanelGroup direction="horizontal" className="h-full">
-        <ResizablePanel
-          defaultSize={isPreviewVisible ? 50 : 100}
-          minSize={20}
-          className="bg-background"
-        >
-          <PlaygroundEditor
-            activeFile={activeFile}
-            content={activeFile.content || ""}
-            onContentChange={onContentChange}
-            onSave={handleSave}
-            suggestion={ai.suggestion}
-            suggestionLoading={ai.isLoading}
-            suggestionPosition={ai.position}
-            onAcceptSuggestion={ai.onAccept}
-            onRejectSuggestion={ai.onReject}
-            onTriggerSuggestion={ai.onTrigger}
-            explanationData={ai.explanationData || null}
-            clearExplanation={ai.clearExplanation || (() => {})}
-          />
-        </ResizablePanel>
+  const activeFileName = `${activeFile.filename}.${activeFile.fileExtension}`;
 
-        {isPreviewVisible && (
-          <>
-            <ResizableHandle withHandle />
-            <ResizablePanel defaultSize={50} minSize={20}>
-              {/* 🚨 THE FIX: "about:blank" kills the infinite loop 🚨 */}
-              <WebContainerPreview
-                templateData={preview.templateData}
-                instance={preview.instance}
-                writeFileSync={preview.writeFileSync || (async () => {})}
-                isLoading={preview.isLoading}
-                error={preview.error}
-                serverUrl={preview.serverUrl || "about:blank"}
-                forceResetup={false}
-                hasRun={preview.hasRun}
-              />
-            </ResizablePanel>
-          </>
-        )}
-      </ResizablePanelGroup>
+  return (
+    <div className="flex-1 overflow-hidden h-full flex">
+      {/* Main editor + preview area */}
+      <div className="flex-1 overflow-hidden">
+        <ResizablePanelGroup direction="horizontal" className="h-full">
+          <ResizablePanel
+            defaultSize={isPreviewVisible ? 50 : 100}
+            minSize={20}
+            className="bg-background"
+          >
+            <PlaygroundEditor
+              activeFile={activeFile}
+              content={activeFile.content || ""}
+              onContentChange={onContentChange}
+              onSave={handleSave}
+              onEditorMount={(editor: any, monaco: any) => {
+                editorRef.current = editor;
+                monacoRef.current = monaco;
+              }}
+              suggestion={ai.suggestion}
+              suggestionLoading={ai.isLoading}
+              suggestionPosition={ai.position}
+              onAcceptSuggestion={ai.onAccept}
+              onRejectSuggestion={ai.onReject}
+              onTriggerSuggestion={ai.onTrigger}
+              explanationData={ai.explanationData || null}
+              clearExplanation={ai.clearExplanation || (() => {})}
+            />
+          </ResizablePanel>
+
+          {isPreviewVisible && (
+            <>
+              <ResizableHandle withHandle />
+              <ResizablePanel defaultSize={50} minSize={20}>
+                <WebContainerPreview
+                  templateData={preview.templateData}
+                  instance={preview.instance}
+                  writeFileSync={preview.writeFileSync || (async () => {})}
+                  isLoading={preview.isLoading}
+                  error={preview.error}
+                  serverUrl={preview.serverUrl || "about:blank"}
+                  forceResetup={false}
+                  hasRun={preview.hasRun}
+                />
+              </ResizablePanel>
+            </>
+          )}
+        </ResizablePanelGroup>
+      </div>
+
+      {/* Inline AI Chat Panel */}
+      {isChatOpen && (
+        <div className="w-[380px] shrink-0 border-l border-zinc-800 flex flex-col overflow-hidden">
+          <AIChatSidePanel
+            isOpen={true}
+            inline={true}
+            onClose={onChatClose || (() => {})}
+            onInsertCode={handleInsertCode}
+            activeFileName={activeFileName}
+            activeFileContent={activeFile.content || ""}
+            activeFileLanguage={activeFile.fileExtension || ""}
+            theme="dark"
+          />
+        </div>
+      )}
     </div>
   );
 };

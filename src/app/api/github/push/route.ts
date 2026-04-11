@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 export async function POST(req: Request) {
   try {
     const session = await auth();
-    
+
     // 🚀 THE MAGIC TRICK: Extract the user as 'any'
     const customUser = session?.user as any;
 
@@ -15,7 +15,7 @@ export async function POST(req: Request) {
 
     const { repo, message, files } = await req.json();
     const [owner, repoName] = repo.split("/");
-    
+
     // Use customUser again!
     const token = customUser.accessToken;
 
@@ -31,7 +31,7 @@ export async function POST(req: Request) {
       const branchData = await branchRes.json();
       parentCommitSha = branchData.commit.sha;
       // CRITICAL FIX: Extract the actual Tree SHA, not the Commit SHA
-      baseTreeSha = branchData.commit.commit.tree.sha; 
+      baseTreeSha = branchData.commit.commit.tree.sha;
     } else {
       // Initialize empty repo
       const initRes = await fetch(`https://api.github.com/repos/${owner}/${repoName}/contents/README.md`, {
@@ -51,14 +51,14 @@ export async function POST(req: Request) {
       const initData = await initRes.json();
       parentCommitSha = initData.commit.sha;
       // CRITICAL FIX: Get the Tree SHA from the init response
-      baseTreeSha = initData.commit.tree.sha; 
+      baseTreeSha = initData.commit.tree.sha;
     }
 
     // 2. Create the Tree (Your files)
     const treeItems = Object.entries(files).map(([path, content]) => {
       // CRITICAL FIX: Remove any leading slashes from the file path
       const cleanPath = path.startsWith('/') ? path.substring(1) : path;
-      
+
       return {
         path: cleanPath,
         mode: "100644",
@@ -79,7 +79,7 @@ export async function POST(req: Request) {
         tree: treeItems,
       }),
     });
-    
+
     const treeData = await treeRes.json();
     if (!treeRes.ok) throw new Error(`Tree Creation Failed: ${treeData.message}`);
 
@@ -93,7 +93,7 @@ export async function POST(req: Request) {
         parents: [parentCommitSha], // Commit needs the parent Commit SHA
       }),
     });
-    
+
     const commitData = await commitRes.json();
     if (!commitRes.ok) throw new Error(`Commit Creation Failed: ${commitData.message}`);
 

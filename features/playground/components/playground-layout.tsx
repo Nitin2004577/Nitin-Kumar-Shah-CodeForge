@@ -1,14 +1,14 @@
 "use client"
 
+import { useState } from "react"
 import { usePlaygroundContext } from "../context/playground-context"
 import { AlertCircle, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { LoadingStep } from "@/components/ui/loader"
 import { PlaygroundHeader } from "./playground-header"
-import { PlaygroundWorkspace } from "./playground-workspace" // ✨ Import the workspace
+import { PlaygroundWorkspace } from "./playground-workspace"
 
 export function PlaygroundLayout() {
-  // Pull everything we need from our unified Context
   const { 
     error, 
     loadingStep, 
@@ -19,7 +19,8 @@ export function PlaygroundLayout() {
     logic 
   } = usePlaygroundContext()
 
-  // --- Error State ---
+  const [isChatOpen, setIsChatOpen] = useState(false)
+
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center h-[calc(100vh-4rem)] p-4">
@@ -33,7 +34,6 @@ export function PlaygroundLayout() {
     )
   }
 
-  // --- Loading State ---
   if (loadingStep < 3 || !templateData) {
     return (
       <div className="flex flex-col items-center justify-center h-[calc(100vh-4rem)] p-4">
@@ -55,10 +55,8 @@ export function PlaygroundLayout() {
     )
   }
 
-  // --- Main IDE Render ---
   return (
     <div className="h-screen flex flex-col overflow-hidden">
-      {/* 1. Header is now fully powered by Context data */}
       <PlaygroundHeader 
         title={playgroundData?.name || "Code Playground"}
         openFilesCount={explorer.openFiles.length}
@@ -69,20 +67,23 @@ export function PlaygroundLayout() {
         onTogglePreview={() => logic.setIsPreviewVisible(!logic.isPreviewVisible)}
         isPreviewVisible={logic.isPreviewVisible}
         onCloseAll={explorer.closeAllFiles}
-        onGitPush={() => {}} // You can add your modal logic here
+        onGitPush={() => {}}
         isPushing={false}
         aiProps={{
           isEnabled: ai.isEnabled,
           onToggle: ai.toggleEnabled as any,
           isLoading: ai.isLoading,
+          isChatOpen,
+          onToggleChat: () => setIsChatOpen((v) => !v),
         } as any}
       />
 
-      {/* 2. Main Workspace Area */}
       <div className="flex-1 min-h-0 flex flex-col">
         <PlaygroundWorkspace
           activeFile={explorer.openFiles?.find((f: any) => f.id === explorer.activeFileId)}
           isPreviewVisible={logic.isPreviewVisible}
+          isChatOpen={isChatOpen}
+          onChatClose={() => setIsChatOpen(false)}
           onContentChange={(val) => {
             if (explorer.activeFileId) {
               explorer.updateFileContent(explorer.activeFileId, val || "");
