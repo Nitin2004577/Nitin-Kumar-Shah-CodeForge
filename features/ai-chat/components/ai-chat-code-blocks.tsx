@@ -3,6 +3,7 @@
 import type React from "react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Copy,
   Check,
@@ -251,7 +252,7 @@ export const EnhancedCodeBlock: React.FC<EnhancedCodeBlockProps> = ({
           <SyntaxHighlighter
             language={language}
             style={theme === "dark" ? vscDarkPlus : vs}
-            showLineNumbers={showNumbers && lineCount > 1}
+            showLineNumbers={showLineNumbers && lineCount > 1}
             wrapLines={true}
             wrapLongLines={true}
             customStyle={{

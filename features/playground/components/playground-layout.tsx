@@ -69,6 +69,11 @@ export function PlaygroundLayout() {
         onCloseAll={explorer.closeAllFiles}
         onGitPush={() => {}}
         isPushing={false}
+        onRun={logic.actions?.handleRun ?? (() => {})}
+        isRunning={logic.isRunning ?? false}
+        hasRun={logic.hasRun ?? false}
+        isAutoSaveEnabled={logic.isAutoSaveEnabled ?? false}
+        onToggleAutoSave={logic.actions?.toggleAutoSave ?? (() => {})}
         aiProps={{
           isEnabled: ai.isEnabled,
           onToggle: ai.toggleEnabled as any,

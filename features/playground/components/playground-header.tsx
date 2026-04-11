@@ -57,6 +57,8 @@ interface PlaygroundHeaderProps {
     isEnabled: boolean;
     onToggle: (value: boolean) => void;
     isLoading: boolean;
+    isChatOpen?: boolean;
+    onToggleChat?: () => void;
     isCodeCompletionAllFilesEnabled: boolean;
     onToggleCodeCompletionAllFiles: (enabled: boolean) => void;
     isCodeCompletionTSXEnabled: boolean;
