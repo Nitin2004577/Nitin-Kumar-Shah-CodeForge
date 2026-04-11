@@ -123,20 +123,19 @@ export const usePlaygroundLogic = (
   const explorer = useFileExplorer();
 
   // --- Auto-save effect ---
+  // Bug fix: use an interval to check for unsaved changes rather than
+  // resetting the debounce timer on every keystroke (which prevented saves)
   useEffect(() => {
     if (!isAutoSaveEnabled) return;
-    const unsaved = explorer.openFiles.filter((f) => f.hasUnsavedChanges);
-    if (unsaved.length === 0) return;
 
-    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-    autoSaveTimerRef.current = setTimeout(() => {
-      handleSaveAll();
-    }, 1500);
+    const interval = setInterval(() => {
+      const unsaved = useFileExplorer.getState().openFiles.filter((f) => f.hasUnsavedChanges);
+      if (unsaved.length > 0) handleSaveAll();
+    }, 2000);
 
-    return () => {
-      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-    };
-  }, [explorer.openFiles, isAutoSaveEnabled]);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAutoSaveEnabled]);
 
   useEffect(() => {
     const mountFiles = async () => {
@@ -163,13 +162,17 @@ export const usePlaygroundLogic = (
 
   useEffect(() => {
     explorer.setPlaygroundId(id);
-  }, [id, explorer.setPlaygroundId]);
+    // Bug fix: setPlaygroundId is a stable Zustand action, safe to omit from deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
   useEffect(() => {
     if (templateData && !explorer.openFiles.length) {
       explorer.setTemplateData(templateData);
     }
-  }, [templateData, explorer.setTemplateData, explorer.openFiles.length]);
+    // Bug fix: setTemplateData is a stable Zustand action, safe to omit
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [templateData]);
 
   // --- 4. Helper: Confirmation Dialog ---
   const requestConfirmation = useCallback(
@@ -278,7 +281,10 @@ export const usePlaygroundLogic = (
       if (!fileToSave) return;
 
       const latestData = useFileExplorer.getState().templateData;
-      if (!latestData) return;
+      if (!latestData) {
+        toast.error("Cannot save: template data not loaded yet.");
+        return;
+      }
 
       try {
         const filePath = findFilePath(fileToSave, latestData);
@@ -323,9 +329,9 @@ export const usePlaygroundLogic = (
         );
 
         toast.success(`Saved ${fileToSave.filename}.${fileToSave.fileExtension}`);
-      } catch (err) {
+      } catch (err: any) {
         console.error("Save failed:", err);
-        toast.error("Failed to save file");
+        toast.error(`Failed to save: ${err?.message ?? "unknown error"}`);
       }
     },
     [explorer, writeFileSync, saveTemplateData]

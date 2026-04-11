@@ -4,83 +4,35 @@ import type React from "react";
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import {
-  Loader2,
-  Send,
-  User,
-  Bot,
-  Copy,
-  Check,
-  X,
-  Paperclip,
-  FileText,
-  Code,
-  Sparkles,
-  MessageSquare,
-  RefreshCw,
-  Plus,
-  Minus,
-  Settings,
-  Zap,
-  Brain,
-  Terminal,
-  Search,
-  Filter,
-  Download,
+  Loader2, Send, Bot, X, Paperclip, FileText, Code,
+  Sparkles, MessageSquare, RefreshCw, Plus, Zap, Brain,
+  Terminal, Search, Copy, Check, ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import remarkMath from "remark-math";
-import rehypeKatex from "rehype-katex";
-import Image from "next/image";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
+  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-  DropdownMenuCheckboxItem,
-} from "@/components/ui/dropdown-menu";
-import "katex/dist/katex.min.css";
 
-// --- 1. SIBLING COMPONENTS (Same Folder) ---
 import { EnhancedCodeBlock } from "./ai-chat-code-blocks";
 import { EnhancedFilePreview } from "./file-preview";
 import { MessageTypeIndicator } from "./MessageTypeIndicator";
 import { CodeSuggestionCard } from "./CodeSuggestionCard";
-
-// --- 2. TYPES & UTILS (Up one level in lib/) ---
-import { FileAttachment, CodeSuggestion, ChatMessage } from "../lib/chat-types";
+import { FileAttachment, ChatMessage } from "../lib/chat-types";
 import {
-  detectLanguage,
-  detectFileType,
-  generateCodeSuggestions,
-  getChatModePrompt,
+  detectLanguage, detectFileType, generateCodeSuggestions, getChatModePrompt,
 } from "../lib/chat-utils";
-
-// --- 3. HOOKS (Up one level in hooks/) ---
 import { useResponsive } from "../hooks/use-responsive";
 
 interface AIChatSidePanelProps {
   isOpen: boolean;
   inline?: boolean;
   onClose: () => void;
-  onInsertCode?: (
-    code: string,
-    fileName?: string,
-    position?: { line: number; column: number }
-  ) => void;
+  onInsertCode?: (code: string, fileName?: string, position?: { line: number; column: number }) => void;
   onRunCode?: (code: string, language: string) => void;
   activeFileName?: string;
   activeFileContent?: string;
@@ -89,635 +41,484 @@ interface AIChatSidePanelProps {
   theme?: "dark" | "light";
 }
 
+type ChatMode = "chat" | "review" | "fix" | "optimize";
+
+const QUICK_PROMPTS = [
+  { label: "Explain this file", icon: Brain },
+  { label: "Find bugs & fix them", icon: Zap },
+  { label: "Write unit tests", icon: Code },
+  { label: "Optimize performance", icon: Terminal },
+  { label: "Add TypeScript types", icon: FileText },
+  { label: "Refactor this code", icon: RefreshCw },
+];
+
 export const AIChatSidePanel: React.FC<AIChatSidePanelProps> = ({
   isOpen,
   inline = false,
   onClose,
   onInsertCode,
-  onRunCode,
   activeFileName,
   activeFileContent,
   activeFileLanguage,
   cursorPosition,
-  theme = "dark",
 }) => {
-  // Setup Responsive Hook
-  const { isMobile, isTablet } = useResponsive();
-
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
-  const [dragOver, setDragOver] = useState(false);
-  const [chatMode, setChatMode] = useState<
-    "chat" | "review" | "fix" | "optimize"
-  >("chat");
+  const [chatMode, setChatMode] = useState<ChatMode>("chat");
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterType, setFilterType] = useState<string>("all");
-  const [showSettings, setShowSettings] = useState(false);
-  const [autoSave, setAutoSave] = useState(true);
-  const [streamResponse, setStreamResponse] = useState(true);
-
+  const [showSearch, setShowSearch] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const scrollToBottom = () => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  };
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      scrollToBottom();
-    }, 100);
-    return () => clearTimeout(timeoutId);
+    if (isOpen) setTimeout(() => textareaRef.current?.focus(), 50);
+  }, [isOpen]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
-  const addFileAttachment = (
-    fileName: string,
-    content: string,
-    mimeType?: string
-  ) => {
+  const addFileAttachment = (fileName: string, content: string, mimeType?: string) => {
     const language = detectLanguage(fileName, content);
     const type = detectFileType(fileName, content);
     if (type !== "code") return;
-    const newFile: FileAttachment = {
-      id: Date.now().toString(),
-      name: fileName,
-      content: content.trim(),
-      language,
-      size: content.length,
-      type,
-      preview: content.substring(0, 200) + (content.length > 200 ? "..." : ""),
-      mimeType,
-    };
-    setAttachments((prev) => [...prev, newFile]);
+    setAttachments((prev) => [
+      ...prev,
+      { id: Date.now().toString(), name: fileName, content: content.trim(), language, size: content.length, type, preview: content.substring(0, 200), mimeType },
+    ]);
   };
 
-  const removeAttachment = (id: string) => {
-    setAttachments((prev) => prev.filter((file) => file.id !== id));
-  };
-
-  const handlePaste = (e: React.ClipboardEvent) => {
-    const pastedText = e.clipboardData.getData("text");
-
-    if (pastedText.length > 50 && pastedText.includes("\n")) {
-      const lines = pastedText.split("\n");
-      const hasImports = lines.some(
-        (line) =>
-          line.trim().startsWith("import ") || line.trim().startsWith("from ")
-      );
-      const hasFunctions = lines.some(
-        (line) =>
-          line.includes("function ") ||
-          line.includes("def ") ||
-          line.includes("=>") ||
-          line.includes("class ") ||
-          line.includes("interface ")
-      );
-      const hasCodeStructure = lines.some(
-        (line) =>
-          line.includes("{") ||
-          line.includes("}") ||
-          line.includes("class ") ||
-          line.includes("SELECT") ||
-          line.includes("CREATE")
-      );
-
-      if (hasImports || hasFunctions || hasCodeStructure) {
-        e.preventDefault();
-
-        let suggestedName = "pasted-code.txt";
-        if (hasImports && pastedText.includes("React")) {
-          suggestedName =
-            pastedText.includes("tsx") || pastedText.includes("interface")
-              ? "component.tsx"
-              : "component.jsx";
-        } else if (
-          pastedText.includes("def ") ||
-          pastedText.includes("import ")
-        ) {
-          suggestedName = "script.py";
-        } else if (
-          pastedText.includes("function ") ||
-          pastedText.includes("=>")
-        ) {
-          suggestedName = pastedText.includes("interface")
-            ? "script.ts"
-            : "script.js";
-        } else if (
-          pastedText.includes("SELECT") ||
-          pastedText.includes("CREATE")
-        ) {
-          suggestedName = "query.sql";
-        } else if (
-          pastedText.includes("<!DOCTYPE") ||
-          pastedText.includes("<html")
-        ) {
-          suggestedName = "page.html";
-        } else if (pastedText.includes("public class")) {
-          suggestedName = "Main.java";
-        }
-
-        const fileName = prompt(
-          `Detected code content! Enter filename:`,
-          suggestedName
-        );
-        if (fileName) {
-          addFileAttachment(fileName, pastedText);
-          return;
-        }
-      }
-    }
+  const removeAttachment = (id: string) => setAttachments((prev) => prev.filter((f) => f.id !== id));
+  const addCurrentFileAsContext = () => {
+    if (activeFileName && activeFileContent) addFileAttachment(activeFileName, activeFileContent);
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    setDragOver(false);
-
-    const files = Array.from(e.dataTransfer.files);
-    files.forEach((file) => {
+    Array.from(e.dataTransfer.files).forEach((file) => {
       const reader = new FileReader();
-      reader.onload = (event) => {
-        const content = event.target?.result as string;
-        addFileAttachment(file.name, content, file.type);
-      };
+      reader.onload = (ev) => addFileAttachment(file.name, ev.target?.result as string, file.type);
       reader.readAsText(file);
     });
   };
 
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isLoading) return;
+  const sendMessage = async (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed || isLoading) return;
 
-    const messageType =
-      chatMode === "chat"
-        ? "chat"
-        : chatMode === "review"
-        ? "code_review"
-        : chatMode === "fix"
-        ? "error_fix"
-        : "optimization";
-
-    const newMessage: ChatMessage = {
-      role: "user",
-      content: input.trim(),
-      timestamp: new Date(),
-      attachments: [...attachments],
-      id: Date.now().toString(),
-      type: messageType,
+    const typeMap: Record<ChatMode, ChatMessage["type"]> = {
+      chat: "chat", review: "code_review", fix: "error_fix", optimize: "optimization",
     };
 
-    setMessages((prev) => [...prev, newMessage]);
+    const userMsg: ChatMessage = {
+      role: "user", content: trimmed, timestamp: new Date(),
+      attachments: [...attachments], id: Date.now().toString(), type: typeMap[chatMode],
+    };
+    setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setIsLoading(true);
 
-    // ✨ 1. Create an AbortController for a 15-second timeout
+    // Placeholder assistant message that we'll stream into
+    const assistantId = (Date.now() + 1).toString();
+    setMessages((prev) => [...prev, { role: "assistant", content: "", id: assistantId, timestamp: new Date(), type: typeMap[chatMode] }]);
+
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
 
     try {
-      let contextualMessage = getChatModePrompt(chatMode, input.trim(), {
+      let contextualMessage = getChatModePrompt(chatMode, trimmed, {
         activeFile: activeFileName,
-        activeFileContent: activeFileContent?.substring(0, 2000),
+        activeFileContent: activeFileContent?.substring(0, 3000),
         language: activeFileLanguage,
         cursorPosition,
-        attachments: attachments.map((f) => ({
-          name: f.name,
-          language: f.language,
-          size: f.size,
-          type: f.type,
-        })),
       });
 
       if (attachments.length > 0) {
         contextualMessage += "\n\nAttached files:\n";
-        attachments.forEach((file) => {
-          contextualMessage += `\n**${file.name}** (${file.language}, ${
-            file.type
-          }):\n\`\`\`${file.language}\n${file.content.substring(
-            0,
-            1000
-          )}\n\`\`\`\n`;
+        attachments.forEach((f) => {
+          contextualMessage += `\n**${f.name}** (${f.language}):\n\`\`\`${f.language}\n${f.content.substring(0, 1500)}\n\`\`\`\n`;
         });
       }
 
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // ✨ 2. Attach the abort signal to the fetch request
         signal: controller.signal,
         body: JSON.stringify({
           message: contextualMessage,
-          history: messages
-            .slice(-10)
-            .map((msg) => ({ role: msg.role, content: msg.content })),
-          // ✨ 3. Force stream to false since we are expecting a single JSON response
-          stream: false,
+          history: messages.slice(-8).map((m) => ({ role: m.role, content: m.content })),
           mode: chatMode,
         }),
       });
 
-      // ✨ Clear the timeout if the request succeeds!
       clearTimeout(timeoutId);
 
-      if (response.ok) {
-        const data = await response.json();
-        const suggestions = generateCodeSuggestions(
-          input.trim(),
-          attachments,
-          activeFileName,
-          activeFileContent,
-          activeFileLanguage
-        );
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+        setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, content: `Error ${response.status}: ${data.error || "Something went wrong."}` } : m));
+        return;
+      }
 
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "assistant",
-            content: data.response,
-            timestamp: new Date(),
-            suggestions: suggestions.length > 0 ? suggestions : undefined,
-            id: Date.now().toString(),
-            type: messageType,
-            tokens: data.tokens,
-            model: data.model || "AI Assistant",
-          },
-        ]);
-      } else {
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "assistant",
-            content: `Error: The server responded with status ${response.status}. Please try again.`,
-            timestamp: new Date(),
-            id: Date.now().toString(),
-          },
-        ]);
+      if (!response.body) {
+        setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, content: "Error: No response body received." } : m));
+        return;
+      }
+
+      // Stream the response token by token
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulated = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        accumulated += chunk;
+        setMessages((prev) =>
+          prev.map((m) => m.id === assistantId ? { ...m, content: accumulated } : m)
+        );
       }
     } catch (error: any) {
-      console.error("Error sending message:", error);
-
-      // ✨ 4. Handle the specific timeout error cleanly
-      const isTimeout = error.name === "AbortError";
-      const errorMessage = isTimeout
-        ? "The request timed out because the AI took too long to respond. Please try again."
-        : "I'm having trouble connecting right now. Please check your internet connection and try again.";
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: errorMessage,
-          timestamp: new Date(),
-          id: Date.now().toString(),
-        },
-      ]);
+      clearTimeout(timeoutId);
+      const errMsg = error.name === "AbortError" ? "Request timed out. Please try again." : "Connection error. Please try again.";
+      setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, content: errMsg } : m));
     } finally {
       setIsLoading(false);
       setAttachments([]);
-      clearTimeout(timeoutId); // Safety clear
     }
   };
 
-  const handleInsertCode = (
-    code: string,
-    fileName?: string,
-    position?: { line: number; column: number }
-  ) => {
-    if (onInsertCode) {
-      onInsertCode(
-        code,
-        fileName || activeFileName,
-        position || cursorPosition
-      );
-    }
+  const handleInsertCode = (code: string, fileName?: string, position?: { line: number; column: number }) => {
+    onInsertCode?.(code, fileName || activeFileName, position || cursorPosition);
   };
 
   const handleCopySuggestion = async (code: string) => {
-    try {
-      await navigator.clipboard.writeText(code);
-    } catch (err) {
-      console.error("Failed to copy code:", err);
-    }
+    try { await navigator.clipboard.writeText(code); } catch {}
   };
 
-  const addCurrentFileAsContext = () => {
-    if (activeFileName && activeFileContent) {
-      addFileAttachment(activeFileName, activeFileContent);
-    }
-  };
+  const filteredMessages = messages.filter((msg) =>
+    !searchTerm ? true : msg.content.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
-  const exportChat = () => {
-    const chatData = {
-      messages,
-      timestamp: new Date().toISOString(),
-      activeFile: activeFileName,
-      attachments: attachments.map((f) => ({
-        name: f.name,
-        size: f.size,
-        type: f.type,
-      })),
-    };
-    const blob = new Blob([JSON.stringify(chatData, null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `ai-chat-${new Date().toISOString().split("T")[0]}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-  const filteredMessages = messages
-    .filter((msg) => (filterType === "all" ? true : msg.type === filterType))
-    .filter((msg) =>
-      !searchTerm
-        ? true
-        : msg.content.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-
-  return (
-    <TooltipProvider>
-      <>
-        {/* Backdrop — only in overlay mode */}
-        {!inline && (
-          <div
-            className={cn(
-              "fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-opacity duration-300",
-              isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
-            )}
-            onClick={onClose}
-          />
-        )}
-
-        {/* Panel — fixed overlay OR inline fill */}
-        <div
-          className={cn(
-            inline
-              ? "flex flex-col h-full w-full bg-zinc-950"
-              : cn(
-                  "fixed right-0 top-0 h-full w-full max-w-[450px] bg-zinc-950 border-l border-zinc-800 z-50 flex flex-col transition-transform duration-300 ease-out shadow-2xl",
-                  isOpen ? "translate-x-0" : "translate-x-full"
-                )
+  // ── Shared panel content (used by both inline and overlay) ───────────────────
+  const panelContent = (
+    <div className="flex flex-col h-full w-full bg-[#0d0d10] border-l border-zinc-800">
+      {/* ── Header ── */}
+      <div className="flex items-center justify-between px-3 py-2.5 border-b border-zinc-800/80 shrink-0 bg-[#111116]">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-md bg-purple-600/20 flex items-center justify-center">
+            <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+          </div>
+          <span className="text-[13px] font-semibold text-zinc-100">AI Chat</span>
+          {activeFileName && (
+            <span className="text-[10px] text-zinc-500 bg-zinc-800/60 px-1.5 py-0.5 rounded truncate max-w-[120px]">
+              {activeFileName}
+            </span>
           )}
-          onDrop={handleDrop}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragOver(true);
-          }}
-          onDragLeave={() => setDragOver(false)}
-        >
-          {/* 1. HEADER */}
-          <div className="p-3 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/50 shrink-0">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 bg-purple-500/10 rounded-lg">
-                <Bot className="w-4 h-4 text-purple-400" />
-              </div>
-              <div>
-                <h2 className="text-sm font-semibold text-zinc-100">
-                  AI Assistant
-                </h2>
-                <div className="flex items-center gap-1.5">
-                  <span className="relative flex h-1.5 w-1.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
-                  </span>
-                  <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium">
-                    Online
-                  </span>
-                </div>
-              </div>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onClose}
-              className="h-7 w-7 text-zinc-500 hover:text-white"
-            >
-              <X className="w-4 h-4" />
-            </Button>
-          </div>
-
-          {/* 2. CHAT MODES (Tabs) */}
-          <div className="px-2 py-1.5 border-b border-zinc-800 bg-zinc-900/30 shrink-0">
-            <Tabs
-              value={chatMode}
-              onValueChange={(v: any) => setChatMode(v)}
-              className="w-full"
-            >
-              <TabsList className="grid grid-cols-4 bg-zinc-900 h-7">
-                <TabsTrigger value="chat" className="text-[10px] gap-1">
-                  <MessageSquare className="w-3 h-3" /> Chat
-                </TabsTrigger>
-                <TabsTrigger value="review" className="text-[10px] gap-1">
-                  <Brain className="w-3 h-3" /> Review
-                </TabsTrigger>
-                <TabsTrigger value="fix" className="text-[10px] gap-1">
-                  <Zap className="w-3 h-3" /> Fix
-                </TabsTrigger>
-                <TabsTrigger value="optimize" className="text-[10px] gap-1">
-                  <Terminal className="w-3 h-3" /> Optimize
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </div>
-
-          {/* 3. MESSAGES AREA */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-thin scrollbar-thumb-zinc-800">
-            {messages.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-50">
-                <Sparkles className="w-12 h-12 text-zinc-700" />
-                <p className="text-sm text-zinc-400 max-w-[200px]">
-                  Ask me to write code, debug errors, or explain logic.
-                </p>
-              </div>
-            ) : (
-              filteredMessages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={cn(
-                    "flex flex-col gap-2",
-                    msg.role === "user" ? "items-end" : "items-start"
-                  )}
-                >
-                  <div className="flex items-center gap-2 px-1">
-                    {msg.role === "assistant" && (
-                      <MessageTypeIndicator
-                        type={msg.type}
-                        model={msg.model}
-                        tokens={msg.tokens}
-                      />
-                    )}
-                  </div>
-
-                  <div
-                    className={cn(
-                      "max-w-[90%] rounded-2xl px-4 py-3 text-sm",
-                      msg.role === "user"
-                        ? "bg-purple-600 text-white rounded-tr-none"
-                        : "bg-zinc-900 text-zinc-200 border border-zinc-800 rounded-tl-none"
-                    )}
-                  >
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      components={{
-                        code({
-                          node,
-                          inline,
-                          className,
-                          children,
-                          ...props
-                        }: any) {
-                          const match = /language-(\w+)/.exec(className || "");
-                          return !inline ? (
-                            <EnhancedCodeBlock
-                              className={className}
-                              onInsert={(code: string) =>
-                                handleInsertCode(code)
-                              }
-                            >
-                              {String(children).replace(/\n$/, "")}
-                            </EnhancedCodeBlock>
-                          ) : (
-                            <code
-                              className="bg-zinc-800 px-1 rounded"
-                              {...props}
-                            >
-                              {children}
-                            </code>
-                          );
-                        },
-                      }}
-                    >
-                      {msg.content}
-                    </ReactMarkdown>
-                  </div>
-
-                  {/* Render Suggestions if any */}
-                  {msg.suggestions?.map((s, i) => (
-                    <CodeSuggestionCard
-                      key={i}
-                      suggestion={s}
-                      onInsert={() => handleInsertCode(s.code)}
-                      onCopy={() => handleCopySuggestion(s.code)}
-                    />
-                  ))}
-                </div>
-              ))
-            )}
-            {isLoading && (
-              <div className="flex items-center gap-2 text-zinc-500 animate-pulse">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span className="text-xs">AI is thinking...</span>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* 4. ATTACHMENTS PREVIEW */}
-          {attachments.length > 0 && (
-            <div className="px-4 py-2 border-t border-zinc-800 bg-zinc-900/50 flex gap-2 overflow-x-auto">
-              {attachments.map((file) => (
-                <div key={file.id} className="relative group shrink-0">
-                  <EnhancedFilePreview
-                    file={file}
-                    onRemove={() => removeAttachment(file.id)}
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* 5. INPUT AREA */}
-          <div className="p-3 bg-zinc-900/80 border-t border-zinc-800 shrink-0">
-            <form onSubmit={handleSendMessage} className="relative">
-              <Textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSendMessage(e as any);
-                  }
-                }}
-                onPaste={handlePaste}
-                placeholder={
-                  activeFileName
-                    ? `Ask about ${activeFileName}...`
-                    : "Ask AI anything..."
-                }
-                className="min-h-[80px] w-full bg-zinc-950 border-zinc-800 focus:border-purple-500/50 resize-none pr-10 pb-9 text-sm placeholder:text-zinc-600"
-              />
-
-              <div className="absolute left-2 bottom-2 flex items-center gap-1">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-zinc-600 hover:text-zinc-300"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      <Paperclip className="w-3.5 h-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Attach file</TooltipContent>
-                </Tooltip>
-
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-zinc-600 hover:text-zinc-300"
-                      onClick={addCurrentFileAsContext}
-                    >
-                      <FileText className="w-3.5 h-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Add active file as context</TooltipContent>
-                </Tooltip>
-              </div>
-
-              <Button
-                type="submit"
-                disabled={!input.trim() || isLoading}
-                className="absolute right-2 bottom-2 h-7 w-7 bg-purple-600 hover:bg-purple-500 text-white disabled:opacity-40"
-                size="icon"
-              >
-                {isLoading ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Send className="w-3.5 h-3.5" />
-                )}
+        </div>
+        <div className="flex items-center gap-0.5">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-6 w-6 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800" onClick={addCurrentFileAsContext}>
+                <Plus className="w-3.5 h-3.5" />
               </Button>
-            </form>
-            <input
-              type="file"
-              ref={fileInputRef}
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) {
-                  const reader = new FileReader();
-                  reader.onload = (event) => {
-                    const content = event.target?.result as string;
-                    addFileAttachment(file.name, content, file.type);
-                  };
-                  reader.readAsText(file);
-                }
-              }}
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">Add current file</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-6 w-6 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800" onClick={() => fileInputRef.current?.click()}>
+                <Paperclip className="w-3.5 h-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">Attach file</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className={cn("h-6 w-6 hover:bg-zinc-800", showSearch ? "text-purple-400" : "text-zinc-500 hover:text-zinc-200")} onClick={() => setShowSearch((v) => !v)}>
+                <Search className="w-3.5 h-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">Search</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-6 w-6 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800" onClick={onClose}>
+                <X className="w-3.5 h-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">Close</TooltipContent>
+          </Tooltip>
+        </div>
+      </div>
+
+      {/* ── Mode tabs ── */}
+      <div className="px-2 pt-2 pb-1.5 border-b border-zinc-800/60 shrink-0">
+        <div className="flex items-center gap-1">
+          {(["chat", "review", "fix", "optimize"] as ChatMode[]).map((mode) => {
+            const icons = { chat: MessageSquare, review: Code, fix: Zap, optimize: Terminal };
+            const Icon = icons[mode];
+            return (
+              <button
+                key={mode}
+                onClick={() => setChatMode(mode)}
+                className={cn(
+                  "flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors capitalize",
+                  chatMode === mode
+                    ? "bg-zinc-700/80 text-zinc-100"
+                    : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/60"
+                )}
+              >
+                <Icon className="w-3 h-3" />
+                {mode}
+              </button>
+            );
+          })}
+        </div>
+        {showSearch && (
+          <div className="relative mt-1.5">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-zinc-500" />
+            <Input
+              autoFocus
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search messages..."
+              className="h-6 pl-7 text-[11px] bg-zinc-900 border-zinc-700 text-zinc-300 placeholder:text-zinc-600 rounded-md"
             />
           </div>
+        )}
+      </div>
+
+      {/* ── Messages ── */}
+      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
+        {messages.length === 0 ? (
+          <EmptyState onQuickAction={sendMessage} activeFileName={activeFileName} />
+        ) : (
+          filteredMessages.map((msg) => (
+            <MessageBubble key={msg.id} msg={msg} onInsertCode={handleInsertCode} onCopySuggestion={handleCopySuggestion} />
+          ))
+        )}
+        {isLoading && (
+          <div className="flex items-start gap-2">
+            <div className="w-5 h-5 rounded-full bg-purple-600/20 flex items-center justify-center shrink-0 mt-0.5">
+              <Bot className="w-3 h-3 text-purple-400" />
+            </div>
+            <div className="flex gap-1 pt-1.5">
+              <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce [animation-delay:0ms]" />
+              <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce [animation-delay:150ms]" />
+              <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce [animation-delay:300ms]" />
+            </div>
+          </div>
+        )}        <div ref={messagesEndRef} />
+      </div>
+
+      {/* ── Attachments ── */}
+      {attachments.length > 0 && (
+        <div className="px-3 py-1.5 border-t border-zinc-800/60 flex gap-1.5 overflow-x-auto shrink-0 bg-zinc-900/40">
+          {attachments.map((f) => (
+            <div key={f.id} className="flex items-center gap-1 bg-zinc-800 rounded px-2 py-0.5 text-[11px] text-zinc-300 shrink-0">
+              <FileText className="w-3 h-3 text-purple-400" />
+              <span className="max-w-[100px] truncate">{f.name}</span>
+              <button onClick={() => removeAttachment(f.id)} className="text-zinc-500 hover:text-red-400 ml-0.5">
+                <X className="w-2.5 h-2.5" />
+              </button>
+            </div>
+          ))}
         </div>
-      </>
+      )}
+
+      {/* ── Input ── */}
+      <div className="px-3 py-2.5 border-t border-zinc-800/80 shrink-0 bg-[#111116]">
+        <div className="relative bg-zinc-900 border border-zinc-700/60 rounded-xl overflow-hidden focus-within:border-purple-500/50 transition-colors">
+          <Textarea
+            ref={textareaRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(input); }
+            }}
+            placeholder={activeFileName ? `Ask about ${activeFileName}...` : "Ask AI anything..."}
+            className="min-h-[72px] max-h-[160px] w-full bg-transparent border-0 focus-visible:ring-0 resize-none px-3 pt-2.5 pb-8 text-[13px] text-zinc-200 placeholder:text-zinc-600"
+            rows={3}
+          />
+          <div className="absolute bottom-1.5 left-2 flex items-center gap-0.5">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-zinc-600 hover:text-zinc-300 hover:bg-zinc-700/50 rounded-md" onClick={() => fileInputRef.current?.click()}>
+                  <Paperclip className="w-3 h-3" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">Attach file</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-zinc-600 hover:text-zinc-300 hover:bg-zinc-700/50 rounded-md" onClick={addCurrentFileAsContext}>
+                  <FileText className="w-3 h-3" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">Add active file</TooltipContent>
+            </Tooltip>
+          </div>
+          <Button
+            onClick={() => sendMessage(input)}
+            disabled={!input.trim() || isLoading}
+            size="icon"
+            className="absolute bottom-1.5 right-1.5 h-6 w-6 bg-purple-600 hover:bg-purple-500 disabled:opacity-30 rounded-md"
+          >
+            {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+          </Button>
+        </div>
+        <p className="text-[10px] text-zinc-600 mt-1 px-0.5">↵ Send · Shift+↵ New line</p>
+      </div>
+
+      <input type="file" ref={fileInputRef} className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = (ev) => addFileAttachment(file.name, ev.target?.result as string, file.type);
+            reader.readAsText(file);
+          }
+          if (e.target) e.target.value = "";
+        }}
+      />
+    </div>
+  );
+
+  // ── INLINE (side panel embedded in layout) ───────────────────────────────────
+  if (inline) {
+    return <TooltipProvider>{panelContent}</TooltipProvider>;
+  }
+
+  // ── OVERLAY (slides in from right, fixed position) ───────────────────────────
+  return (
+    <TooltipProvider>
+      <div
+        className={cn(
+          "fixed top-0 right-0 h-full w-[340px] z-40 shadow-2xl transition-transform duration-200 ease-out",
+          isOpen ? "translate-x-0" : "translate-x-full"
+        )}
+        onDrop={handleDrop}
+        onDragOver={(e) => e.preventDefault()}
+      >
+        {panelContent}
+      </div>
     </TooltipProvider>
   );
 };
+
+// ── Empty state ───────────────────────────────────────────────────────────────
+function EmptyState({ onQuickAction, activeFileName }: { onQuickAction: (p: string) => void; activeFileName?: string }) {
+  return (
+    <div className="flex flex-col gap-4 pt-2">
+      <div className="flex flex-col items-center gap-2 text-center py-2">
+        <div className="relative w-10 h-10 flex items-center justify-center">
+          <div className="absolute inset-0 bg-purple-600/10 rounded-full" />
+          <Bot className="w-5 h-5 text-purple-400" />
+        </div>
+        <div>
+          <p className="text-[13px] font-medium text-zinc-300">AI Assistant</p>
+          <p className="text-[11px] text-zinc-600 mt-0.5">
+            {activeFileName ? `Ask anything about ${activeFileName}` : "Ask me anything about your code"}
+          </p>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-1">
+        {QUICK_PROMPTS.map((q) => (
+          <button
+            key={q.label}
+            onClick={() => onQuickAction(q.label)}
+            className="flex items-center gap-2.5 bg-zinc-900/60 hover:bg-zinc-800/80 border border-zinc-800/60 hover:border-zinc-700 rounded-lg px-3 py-2 text-left transition-all group"
+          >
+            <q.icon className="w-3.5 h-3.5 text-purple-400/70 group-hover:text-purple-400 shrink-0 transition-colors" />
+            <span className="text-[12px] text-zinc-500 group-hover:text-zinc-300 transition-colors">{q.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MessageBubble({
+  msg,
+  onInsertCode,
+  onCopySuggestion,
+}: {
+  msg: ChatMessage;
+  onInsertCode?: (code: string) => void;
+  onCopySuggestion?: (code: string) => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const isStreaming = msg.role === "assistant" && msg.content === "";
+
+  const copyMessage = async () => {
+    await navigator.clipboard.writeText(msg.content);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  if (msg.role === "user") {
+    return (
+      <div className="flex justify-end">
+        <div className="max-w-[85%] bg-purple-600/90 text-white rounded-2xl rounded-tr-sm px-3 py-2 text-[13px] leading-relaxed">
+          {msg.content}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex gap-2 items-start group">
+      <div className="w-5 h-5 rounded-full bg-purple-600/20 border border-purple-500/20 flex items-center justify-center shrink-0 mt-0.5">
+        <Bot className="w-2.5 h-2.5 text-purple-400" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="bg-zinc-900/80 border border-zinc-800/60 rounded-2xl rounded-tl-sm px-3 py-2.5 text-[13px] text-zinc-200 leading-relaxed min-h-[36px]">
+          {isStreaming ? (
+            <span className="inline-flex items-center gap-1 text-zinc-500">
+              <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce [animation-delay:0ms]" />
+              <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce [animation-delay:150ms]" />
+              <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce [animation-delay:300ms]" />
+            </span>
+          ) : (
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                code({ node, inline, className, children, ...props }: any) {
+                  return !inline ? (
+                    <EnhancedCodeBlock className={className} onInsert={onInsertCode ? (code) => onInsertCode(code) : undefined}>
+                      {String(children).replace(/\n$/, "")}
+                    </EnhancedCodeBlock>
+                  ) : (
+                    <code className="bg-zinc-800 px-1 py-0.5 rounded text-[12px] font-mono text-purple-300" {...props}>{children}</code>
+                  );
+                },
+                p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-0.5">{children}</ul>,
+                ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-0.5">{children}</ol>,
+                li: ({ children }) => <li className="text-zinc-300">{children}</li>,
+              }}
+            >
+              {msg.content}
+            </ReactMarkdown>
+          )}
+        </div>
+        {!isStreaming && (
+          <div className="flex items-center gap-2 mt-1 px-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button onClick={copyMessage} className="flex items-center gap-1 text-[10px] text-zinc-600 hover:text-zinc-400 transition-colors">
+              {copied ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
+              {copied ? "Copied" : "Copy"}
+            </button>
+            {msg.tokens && <span className="text-[10px] text-zinc-700">{msg.tokens} tokens</span>}
+          </div>
+        )}
+        {msg.suggestions?.map((s, i) => (
+          <CodeSuggestionCard key={i} suggestion={s} onInsert={() => onInsertCode?.(s.code)} onCopy={() => onCopySuggestion?.(s.code)} />
+        ))}
+      </div>
+    </div>
+  );
+}

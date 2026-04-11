@@ -88,8 +88,7 @@ export function PlaygroundLayout() {
           onToggleNextEditSuggestions: () => {},
           onTriggerAISuggestion: () => {},
           activeFile: explorer.openFiles?.find((f: any) => f.id === explorer.activeFileId),
-        }}
-      />
+        }}      />
 
       <div className="flex-1 min-h-0 flex flex-col">
         <PlaygroundWorkspace

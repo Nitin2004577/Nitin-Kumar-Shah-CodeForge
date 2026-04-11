@@ -66,37 +66,21 @@ export const PlaygroundWorkspace: React.FC<PlaygroundWorkspaceProps> = ({
   // --- PERSISTENCE LOGIC ---
   useEffect(() => {
     if (activeFile && activeFile.id !== lastLoadedFileId.current) {
-      // FIX: Include the extension in the storage key to avoid collisions
       const fullPath = `${activeFile.filename}.${activeFile.fileExtension}`;
       const savedContent = localStorage.getItem(`file-storage-${fullPath}`);
-
       if (savedContent && savedContent !== activeFile.content) {
         onContentChange(savedContent);
       }
-
       lastLoadedFileId.current = activeFile.id;
     }
-  }, [
-    activeFile?.id,
-    activeFile?.filename,
-    activeFile?.fileExtension,
-    onContentChange,
-  ]);
+  }, [activeFile?.id, activeFile?.filename, activeFile?.fileExtension, onContentChange]);
 
   const handleSave = async (newContent: string) => {
     if (!activeFile || !preview.writeFileSync) return;
-
     try {
-      // FIX: WebContainer MUST have the extension to bundle correctly
       const fullPath = `${activeFile.filename}.${activeFile.fileExtension}`;
-
-      // 1. Write to WebContainer
       await preview.writeFileSync(fullPath, newContent);
-
-      // 2. Persist to LocalStorage using the full path
       localStorage.setItem(`file-storage-${fullPath}`, newContent);
-
-      console.log(`🚀 Sync Successful: ${fullPath}`);
     } catch (err) {
       console.error("❌ Save failed:", err);
     }
@@ -110,12 +94,7 @@ export const PlaygroundWorkspace: React.FC<PlaygroundWorkspaceProps> = ({
     if (!position) return;
     editor.executeEdits("ai-insert", [
       {
-        range: new monaco.Range(
-          position.lineNumber,
-          position.column,
-          position.lineNumber,
-          position.column
-        ),
+        range: new monaco.Range(position.lineNumber, position.column, position.lineNumber, position.column),
         text: code,
         forceMoveMarkers: true,
       },
@@ -123,73 +102,86 @@ export const PlaygroundWorkspace: React.FC<PlaygroundWorkspaceProps> = ({
     editor.focus();
   };
 
-  if (!activeFile) {
-    return (
-      <div className="flex flex-col h-full items-center justify-center text-muted-foreground gap-4 bg-muted/10">
-        <FileText className="h-16 w-16 text-muted-foreground/30" />
-        <div className="text-center">
-          <p className="text-lg font-medium text-foreground">No files open</p>
-          <p className="text-sm text-muted-foreground">
-            Select a file to start
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // Keep a ref to handleInsertCode so the event listener always calls the latest version
+  const handleInsertCodeRef = useRef(handleInsertCode);
+  useEffect(() => { handleInsertCodeRef.current = handleInsertCode; });
 
-  const activeFileName = `${activeFile.filename}.${activeFile.fileExtension}`;
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const code = (e as CustomEvent).detail?.code;
+      if (code) handleInsertCodeRef.current(code);
+    };
+    window.addEventListener("ai-insert-code", handler);
+    return () => window.removeEventListener("ai-insert-code", handler);
+  }, []);
+
+  const activeFileName = activeFile
+    ? `${activeFile.filename}.${activeFile.fileExtension}`
+    : undefined;
 
   return (
     <div className="flex-1 overflow-hidden h-full flex">
       {/* Main editor + preview area */}
       <div className="flex-1 overflow-hidden">
-        <ResizablePanelGroup direction="horizontal" className="h-full">
-          <ResizablePanel
-            defaultSize={isPreviewVisible ? 50 : 100}
-            minSize={20}
-            className="bg-background"
-          >
-            <PlaygroundEditor
-              activeFile={activeFile}
-              content={activeFile.content || ""}
-              onContentChange={onContentChange}
-              onSave={handleSave}
-              onEditorMount={(editor: any, monaco: any) => {
-                editorRef.current = editor;
-                monacoRef.current = monaco;
-              }}
-              suggestion={ai.suggestion}
-              suggestionLoading={ai.isLoading}
-              suggestionPosition={ai.position}
-              onAcceptSuggestion={ai.onAccept}
-              onRejectSuggestion={ai.onReject}
-              onTriggerSuggestion={ai.onTrigger}
-              explanationData={ai.explanationData || null}
-              clearExplanation={ai.clearExplanation || (() => {})}
-            />
-          </ResizablePanel>
+        {!activeFile ? (
+          <div className="flex flex-col h-full items-center justify-center text-muted-foreground gap-4 bg-muted/10">
+            <FileText className="h-16 w-16 text-muted-foreground/30" />
+            <div className="text-center">
+              <p className="text-lg font-medium text-foreground">No files open</p>
+              <p className="text-sm text-muted-foreground">
+                Select a file to start
+              </p>
+            </div>
+          </div>
+        ) : (
+          <ResizablePanelGroup direction="horizontal" className="h-full">
+            <ResizablePanel
+              defaultSize={isPreviewVisible ? 50 : 100}
+              minSize={20}
+              className="bg-background"
+            >
+              <PlaygroundEditor
+                activeFile={activeFile}
+                content={activeFile.content || ""}
+                onContentChange={onContentChange}
+                onSave={handleSave}
+                onEditorMount={(editor: any, monaco: any) => {
+                  editorRef.current = editor;
+                  monacoRef.current = monaco;
+                }}
+                suggestion={ai.suggestion}
+                suggestionLoading={ai.isLoading}
+                suggestionPosition={ai.position}
+                onAcceptSuggestion={ai.onAccept}
+                onRejectSuggestion={ai.onReject}
+                onTriggerSuggestion={ai.onTrigger}
+                explanationData={ai.explanationData || null}
+                clearExplanation={ai.clearExplanation || (() => {})}
+              />
+            </ResizablePanel>
 
-          {isPreviewVisible && (
-            <>
-              <ResizableHandle withHandle />
-              <ResizablePanel defaultSize={50} minSize={20}>
-                <WebContainerPreview
-                  templateData={preview.templateData}
-                  instance={preview.instance}
-                  writeFileSync={preview.writeFileSync || (async () => {})}
-                  isLoading={preview.isLoading}
-                  error={preview.error}
-                  serverUrl={preview.serverUrl || "about:blank"}
-                  forceResetup={false}
-                  hasRun={preview.hasRun}
-                />
-              </ResizablePanel>
-            </>
-          )}
-        </ResizablePanelGroup>
+            {isPreviewVisible && (
+              <>
+                <ResizableHandle withHandle />
+                <ResizablePanel defaultSize={50} minSize={20}>
+                  <WebContainerPreview
+                    templateData={preview.templateData}
+                    instance={preview.instance}
+                    writeFileSync={preview.writeFileSync || (async () => {})}
+                    isLoading={preview.isLoading}
+                    error={preview.error}
+                    serverUrl={preview.serverUrl || "about:blank"}
+                    forceResetup={false}
+                    hasRun={preview.hasRun}
+                  />
+                </ResizablePanel>
+              </>
+            )}
+          </ResizablePanelGroup>
+        )}
       </div>
 
-      {/* Inline AI Chat Panel */}
+      {/* Inline AI Chat Panel — always available regardless of open file */}
       {isChatOpen && (
         <div className="w-[380px] shrink-0 border-l border-zinc-800 flex flex-col overflow-hidden">
           <AIChatSidePanel
@@ -198,8 +190,8 @@ export const PlaygroundWorkspace: React.FC<PlaygroundWorkspaceProps> = ({
             onClose={onChatClose || (() => {})}
             onInsertCode={handleInsertCode}
             activeFileName={activeFileName}
-            activeFileContent={activeFile.content || ""}
-            activeFileLanguage={activeFile.fileExtension || ""}
+            activeFileContent={activeFile?.content || ""}
+            activeFileLanguage={activeFile?.fileExtension || ""}
             theme="dark"
           />
         </div>
