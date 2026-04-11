@@ -58,22 +58,18 @@ export const useWebContainer = (): UseWebContainerReturn => {
     if (!instance) return;
 
     try {
-      const targetPath = (path.endsWith('.tsx') || path.endsWith('.css') || path.endsWith('.ts')) 
-        && !path.startsWith('src/') 
-        ? `src/${path}` 
-        : path;
+      // Use the path exactly as given — no src/ prepending
+      // The caller (playground-workspace) already knows the correct path
+      const cleanPath = path.startsWith("/") ? path.slice(1) : path;
 
-      const parts = targetPath.split('/');
+      // Ensure parent directories exist
+      const parts = cleanPath.split("/");
       if (parts.length > 1) {
-        const folder = parts.slice(0, -1).join('/');
+        const folder = parts.slice(0, -1).join("/");
         await instance.fs.mkdir(folder, { recursive: true });
       }
 
-      await instance.fs.writeFile(targetPath, content);
-      
-      const filename = path.split('/').pop() || path;
-      localStorage.setItem(`file-storage-${filename}`, content);
-      
+      await instance.fs.writeFile(cleanPath, content);
     } catch (err) {
       console.error(`❌ Failed to write file: ${path}`, err);
       throw err;

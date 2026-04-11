@@ -62,6 +62,7 @@ export const PlaygroundWorkspace: React.FC<PlaygroundWorkspaceProps> = ({
   const internalMonacoRef = useRef<any>(null);
   const editorRef = externalEditorRef ?? internalEditorRef;
   const monacoRef = externalMonacoRef ?? internalMonacoRef;
+  const liveWriteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // --- PERSISTENCE LOGIC ---
   useEffect(() => {
@@ -75,8 +76,25 @@ export const PlaygroundWorkspace: React.FC<PlaygroundWorkspaceProps> = ({
     }
   }, [activeFile?.id, activeFile?.filename, activeFile?.fileExtension, onContentChange]);
 
+  // Debounced live write — pushes every edit to WebContainer after 300ms idle
+  // This triggers Vite/webpack HMR without waiting for Ctrl+S
+  const handleLiveWrite = (newContent: string) => {
+    if (!activeFile || !preview.writeFileSync) return;
+    if (liveWriteTimer.current) clearTimeout(liveWriteTimer.current);
+    liveWriteTimer.current = setTimeout(async () => {
+      try {
+        const fullPath = `${activeFile.filename}.${activeFile.fileExtension}`;
+        await preview.writeFileSync!(fullPath, newContent);
+      } catch (err) {
+        // Silent — live write failures shouldn't interrupt editing
+      }
+    }, 300);
+  };
+
   const handleSave = async (newContent: string) => {
     if (!activeFile || !preview.writeFileSync) return;
+    // Cancel any pending live write — save is immediate
+    if (liveWriteTimer.current) clearTimeout(liveWriteTimer.current);
     try {
       const fullPath = `${activeFile.filename}.${activeFile.fileExtension}`;
       await preview.writeFileSync(fullPath, newContent);
@@ -112,7 +130,10 @@ export const PlaygroundWorkspace: React.FC<PlaygroundWorkspaceProps> = ({
       if (code) handleInsertCodeRef.current(code);
     };
     window.addEventListener("ai-insert-code", handler);
-    return () => window.removeEventListener("ai-insert-code", handler);
+    return () => {
+      window.removeEventListener("ai-insert-code", handler);
+      if (liveWriteTimer.current) clearTimeout(liveWriteTimer.current);
+    };
   }, []);
 
   const activeFileName = activeFile
@@ -143,7 +164,10 @@ export const PlaygroundWorkspace: React.FC<PlaygroundWorkspaceProps> = ({
               <PlaygroundEditor
                 activeFile={activeFile}
                 content={activeFile.content || ""}
-                onContentChange={onContentChange}
+                onContentChange={(val) => {
+                  onContentChange(val);
+                  handleLiveWrite(val || "");
+                }}
                 onSave={handleSave}
                 onEditorMount={(editor: any, monaco: any) => {
                   editorRef.current = editor;
