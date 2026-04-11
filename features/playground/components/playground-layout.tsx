@@ -80,7 +80,15 @@ export function PlaygroundLayout() {
           isLoading: ai.isLoading,
           isChatOpen,
           onToggleChat: () => setIsChatOpen((v) => !v),
-        } as any}
+          isCodeCompletionAllFilesEnabled: false,
+          onToggleCodeCompletionAllFiles: () => {},
+          isCodeCompletionTSXEnabled: false,
+          onToggleCodeCompletionTSX: () => {},
+          isNextEditSuggestionsEnabled: false,
+          onToggleNextEditSuggestions: () => {},
+          onTriggerAISuggestion: () => {},
+          activeFile: explorer.openFiles?.find((f: any) => f.id === explorer.activeFileId),
+        }}
       />
 
       <div className="flex-1 min-h-0 flex flex-col">

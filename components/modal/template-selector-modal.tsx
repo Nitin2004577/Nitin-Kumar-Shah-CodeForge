@@ -68,8 +68,8 @@ const templates: TemplateOption[] = [
     name: "Next.js",
     description:
       "The React framework for production with server-side rendering and static site generation",
-    icon: "/nextjs-icon.svg",
-    color: "#000000",
+    icon: "/next.svg",
+    color: "#ffffff",
     popularity: 4,
     tags: ["React", "SSR", "Fullstack"],
     features: ["Server Components", "API Routes", "File-based Routing"],
@@ -81,7 +81,7 @@ const templates: TemplateOption[] = [
     description:
       "Fast, unopinionated, minimalist web framework for Node.js to build APIs and web applications",
     icon: "/expressjs-icon.svg",
-    color: "#000000",
+    color: "#ffffff",
     popularity: 4,
     tags: ["Node.js", "API", "Backend"],
     features: ["Middleware", "Routing", "HTTP Utilities"],
@@ -104,7 +104,7 @@ const templates: TemplateOption[] = [
     name: "Hono",
     description:
       "Fast, lightweight, built on Web Standards. Support for any JavaScript runtime.",
-    icon: "/hono.svg",
+    icon: "/hono-logo.webp",
     color: "#e36002",
     popularity: 3,
     tags: ["Node.js", "TypeScript", "Backend"],
@@ -120,10 +120,10 @@ const templates: TemplateOption[] = [
     name: "Angular",
     description:
       "Angular is a web framework that empowers developers to build fast, reliable applications.",
-    icon: "/angular-2.svg",
+    icon: "/angular-logo.webp",
     color: "#DD0031",
     popularity: 3,
-    tags: ["React", "Fullstack", "JavaScript"],
+    tags: ["TypeScript", "Fullstack", "JavaScript"],
     features: [
       "Reactive Data Binding",
       "Component System",
