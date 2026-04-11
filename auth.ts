@@ -55,7 +55,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
       }
 
       // C. If provider is github but accessToken is missing, fetch from DB Account
-      if (token.provider === "github" && !token.accessToken) {
+      if (token.provider === "github" && !token.accessToken && token.sub) {
         try {
           const dbAccount = await db.account.findFirst({
             where: { userId: token.sub, provider: "github" },
@@ -67,6 +67,20 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
         } catch (_) {
           // DB unavailable — continue without token
         }
+      }
+
+      // D. Also re-hydrate accessToken on every request if it's missing
+      // (handles cases where token was serialized without it)
+      if (!token.accessToken && token.sub && token.provider) {
+        try {
+          const dbAccount = await db.account.findFirst({
+            where: { userId: token.sub, provider: token.provider as string },
+            select: { access_token: true },
+          });
+          if (dbAccount?.access_token) {
+            token.accessToken = dbAccount.access_token;
+          }
+        } catch (_) {}
       }
 
       return token;

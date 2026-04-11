@@ -6,25 +6,41 @@ export async function GET() {
     const session = await auth();
     const token = (session?.user as any)?.accessToken;
 
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!session?.user) {
+      return NextResponse.json({ error: "Not authenticated. Please sign in." }, { status: 401 });
     }
 
-    // Fetch all repos the user has access to (up to 100)
+    if (!token) {
+      return NextResponse.json(
+        { error: "No GitHub access token found. Please sign out and sign back in with GitHub." },
+        { status: 401 }
+      );
+    }
+
     const res = await fetch(
       "https://api.github.com/user/repos?per_page=100&sort=updated&affiliation=owner,collaborator",
       {
         headers: {
           Authorization: `Bearer ${token}`,
           Accept: "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2022-11-28",
         },
+        // Don't cache — always fetch fresh list
+        cache: "no-store",
       }
     );
 
-    if (!res.ok) {
-      const err = await res.json();
+    if (res.status === 401) {
       return NextResponse.json(
-        { error: err.message || "Failed to fetch repositories" },
+        { error: "GitHub token expired or revoked. Please sign out and sign back in with GitHub." },
+        { status: 401 }
+      );
+    }
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return NextResponse.json(
+        { error: err.message || `GitHub API error (${res.status})` },
         { status: res.status }
       );
     }

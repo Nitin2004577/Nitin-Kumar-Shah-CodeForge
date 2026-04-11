@@ -38,6 +38,7 @@ export const GithubPushModal: React.FC<GithubPushModalProps> = ({
 
   const [repos, setRepos] = useState<Repo[]>([]);
   const [isLoadingRepos, setIsLoadingRepos] = useState(false);
+  const [repoError, setRepoError] = useState<string | null>(null);
   const [selectedRepo, setSelectedRepo] = useState<Repo | null>(null);
   const [commitMessage, setCommitMessage] = useState("Update from CodeForge IDE");
   const [isPushing, setIsPushing] = useState(false);
@@ -45,17 +46,22 @@ export const GithubPushModal: React.FC<GithubPushModalProps> = ({
 
   useEffect(() => {
     if (isOpen && isGithubUser) fetchRepositories();
-    if (!isOpen) { setSelectedRepo(null); setSearch(""); }
+    if (!isOpen) { setSelectedRepo(null); setSearch(""); setRepoError(null); }
   }, [isOpen, isGithubUser]);
 
   const fetchRepositories = async () => {
     setIsLoadingRepos(true);
+    setRepoError(null);
     try {
       const res = await fetch("/api/github/repos");
-      if (!res.ok) return;
       const data = await res.json();
+      if (!res.ok) {
+        setRepoError(data.error || `Failed to fetch repositories (${res.status})`);
+        return;
+      }
       setRepos(data.repos || []);
-    } catch (err) {
+    } catch (err: any) {
+      setRepoError("Network error — could not reach GitHub API.");
       console.error("Failed to fetch repos", err);
     } finally {
       setIsLoadingRepos(false);
@@ -137,6 +143,14 @@ export const GithubPushModal: React.FC<GithubPushModalProps> = ({
                   <div className="flex items-center justify-center h-full gap-2 text-muted-foreground">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     <span className="text-sm">Fetching repositories…</span>
+                  </div>
+                ) : repoError ? (
+                  <div className="flex flex-col items-center justify-center h-full gap-3 px-4 text-center">
+                    <AlertCircle className="h-6 w-6 text-red-400" />
+                    <p className="text-xs text-red-400">{repoError}</p>
+                    <Button size="sm" variant="outline" onClick={fetchRepositories} className="h-7 text-xs">
+                      Retry
+                    </Button>
                   </div>
                 ) : filtered.length === 0 ? (
                   <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
