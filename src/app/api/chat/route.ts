@@ -60,7 +60,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // Ensure the API key exists
+    
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
       console.error("Missing GROQ_API_KEY environment variable.");

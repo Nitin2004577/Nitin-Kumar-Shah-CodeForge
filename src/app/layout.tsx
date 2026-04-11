@@ -36,6 +36,7 @@ export default async function RootLayout({
         defaultTheme="system"
         enableSystem
         disableTransitionOnChange
+        scriptProps={{ "data-cfasync": "false" }}
         >
           <QueryProvider>
             <div className="flex flex-col min-h-screen">

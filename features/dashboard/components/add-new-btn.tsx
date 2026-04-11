@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react"
 import { toast } from "sonner";
 
-const AddNewButton = () => {
+const AddNewButton = ({ compact = false }: { compact?: boolean }) => {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<{
     title: string;
@@ -34,6 +34,15 @@ const AddNewButton = () => {
 
   return (
     <>
+      {compact ? (
+        <Button
+          onClick={() => setIsModalOpen(true)}
+          className="gap-2 bg-[#E93F3F] hover:bg-[#d63535] text-white"
+        >
+          <Plus className="h-4 w-4" />
+          New Project
+        </Button>
+      ) : (
       <div
         onClick={() => setIsModalOpen(true)}
         className="group px-6 py-6 flex flex-row justify-between items-center border rounded-lg bg-muted cursor-pointer 
@@ -66,6 +75,7 @@ const AddNewButton = () => {
           />
         </div>
       </div>
+      )}
       
       <TemplateSelectionModal 
         isOpen={isModalOpen} 

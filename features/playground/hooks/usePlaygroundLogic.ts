@@ -52,6 +52,10 @@ export const usePlaygroundLogic = (
   // --- 1. Local UI State ---
   const [isPreviewVisible, setIsPreviewVisible] = useState(true);
   const [serverUrl, setServerUrl] = useState<string | null>(null);
+  const [hasRun, setHasRun] = useState(false);
+  const [isRunning, setIsRunning] = useState(false);
+  const [isAutoSaveEnabled, setIsAutoSaveEnabled] = useState(false);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const lastSyncedContent = useRef<Map<string, string>>(new Map());
   const [dialogState, setDialogState] = useState({
@@ -95,24 +99,49 @@ export const usePlaygroundLogic = (
     const onServerReady = (port: number, url: string) => {
       console.log("Server ready:", url);
       setServerUrl(url);
+      setIsRunning(false);
     };
 
     instance.on("server-ready", onServerReady);
 
-    // CLEANUP: Prevent duplicate listeners during Next.js Hot Reloads
     return () => {
       setServerUrl(null);
     };
   }, [instance]);
 
+  // --- Run handler ---
+  const handleRun = useCallback(() => {
+    setHasRun(true);
+    setIsRunning(true);
+    setServerUrl(null);
+  }, []);
+
   // --- 2.5.2 Manual Mount Effect ---
   const hasMounted = useRef(false);
 
+  // --- 3. File Explorer Integration (must be before auto-save effect) ---
+  const explorer = useFileExplorer();
+
+  // --- Auto-save effect ---
+  useEffect(() => {
+    if (!isAutoSaveEnabled) return;
+    const unsaved = explorer.openFiles.filter((f) => f.hasUnsavedChanges);
+    if (unsaved.length === 0) return;
+
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      handleSaveAll();
+    }, 1500);
+
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  }, [explorer.openFiles, isAutoSaveEnabled]);
+
   useEffect(() => {
     const mountFiles = async () => {
-      // Check the lock! Only mount if we haven't done it yet.
       if (instance && templateData && !hasMounted.current) {
-        hasMounted.current = true; // Lock it immediately!
+        hasMounted.current = true;
 
         try {
           // Convert the custom TemplateFolder into a FileSystemTree
@@ -131,9 +160,6 @@ export const usePlaygroundLogic = (
     };
     mountFiles();
   }, [instance, templateData]);
-
-  // --- 3. File Explorer Integration ---
-  const explorer = useFileExplorer();
 
   useEffect(() => {
     explorer.setPlaygroundId(id);
@@ -337,9 +363,14 @@ export const usePlaygroundLogic = (
     setIsPreviewVisible,
     containerLoading,
     containerError,
-    serverUrl, // Returning our local state URL
+    serverUrl,
     instance,
     writeFileSync,
+    hasRun,
+    isRunning,
+    handleRun,
+    isAutoSaveEnabled,
+    toggleAutoSave: () => setIsAutoSaveEnabled((v) => !v),
 
     dialog: {
       ...dialogState,

@@ -10,6 +10,8 @@ import {
   Settings,
   Github,
   ArrowLeft,
+  Play,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
@@ -43,6 +45,12 @@ interface PlaygroundHeaderProps {
   onGitPush?: () => void;
   isPushing?: boolean;
   isPreviewVisible: boolean;
+  // Run & auto-save
+  onRun: () => void;
+  isRunning: boolean;
+  hasRun: boolean;
+  isAutoSaveEnabled: boolean;
+  onToggleAutoSave: () => void;
 
   // UPDATED: Added all the props needed for the new AI components
   aiProps: {
@@ -72,6 +80,11 @@ export const PlaygroundHeader: React.FC<PlaygroundHeaderProps> = ({
   onGitPush,
   isPushing,
   isPreviewVisible,
+  onRun,
+  isRunning,
+  hasRun,
+  isAutoSaveEnabled,
+  onToggleAutoSave,
   aiProps,
 }) => {
   const router = useRouter();
@@ -114,8 +127,8 @@ export const PlaygroundHeader: React.FC<PlaygroundHeaderProps> = ({
           isEnabled={aiProps.isEnabled}
           onToggle={aiProps.onToggle}
           suggestionLoading={aiProps.isLoading}
-          activeFeature={aiProps.isLoading ? "Generating..." : undefined}
-          loadingProgress={aiProps.isLoading ? 65 : 0}
+          isChatOpen={aiProps.isChatOpen}
+          onToggleChat={aiProps.onToggleChat}
         />
 
         <AISettingsDropdown
@@ -136,6 +149,30 @@ export const PlaygroundHeader: React.FC<PlaygroundHeaderProps> = ({
           activeFile={aiProps.activeFile}
         />
         {/* -------------------------------------- */}
+
+        {/* Run Button */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="sm"
+              onClick={onRun}
+              disabled={isRunning}
+              className="h-8 gap-1.5 bg-green-600 hover:bg-green-500 text-white border-0"
+            >
+              {isRunning ? (
+                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Play className="h-3.5 w-3.5 fill-white" />
+              )}
+              <span className="hidden sm:inline text-xs font-medium">
+                {isRunning ? "Running..." : hasRun ? "Restart" : "Run"}
+              </span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            {hasRun ? "Restart the dev server" : "Start the preview server"}
+          </TooltipContent>
+        </Tooltip>
 
         {/* Git Push Button */}
         {onGitPush && (
@@ -183,6 +220,14 @@ export const PlaygroundHeader: React.FC<PlaygroundHeaderProps> = ({
                 <PanelRightOpen className="mr-2 h-4 w-4" />
               )}
               {isPreviewVisible ? "Hide Preview" : "Show Preview"}
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+
+            <DropdownMenuLabel>Auto Save</DropdownMenuLabel>
+            <DropdownMenuItem onClick={onToggleAutoSave}>
+              <Save className="mr-2 h-4 w-4" />
+              {isAutoSaveEnabled ? "✓ Auto Save On" : "Auto Save Off"}
             </DropdownMenuItem>
 
             <DropdownMenuSeparator />

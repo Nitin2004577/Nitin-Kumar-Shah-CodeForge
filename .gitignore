@@ -47,3 +47,11 @@ next-env.d.ts
 /src/generated/prisma
 
 /generated/prisma
+
+jest.config.ts
+jest.setup.ts
+styleMock.ts
+__tests__/
+__mocks__/
+41
+
