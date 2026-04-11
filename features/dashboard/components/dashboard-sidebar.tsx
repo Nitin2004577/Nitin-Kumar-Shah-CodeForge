@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { signOut } from "next-auth/react"
 import { ProxyAvatar } from "@/components/ui/proxy-avatar"
 import {
@@ -45,6 +45,9 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar"
+import TemplateSelectionModal from "../../../components/modal/template-selector-modal"
+import { createPlayground } from "../../playground/actions"
+import { toast } from "sonner"
 
 interface PlaygroundData {
   id: string
@@ -71,15 +74,27 @@ export function DashboardSidebar({
   user: SidebarUser
 }) {
   const pathname = usePathname()
+  const router = useRouter()
   const [starredPlaygrounds] = useState(initialPlaygroundData.filter((p) => p.starred))
   const [recentPlaygrounds] = useState(initialPlaygroundData)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+
+  const handleCreatePlayground = async (data: {
+    title: string
+    template: "REACT" | "NEXTJS" | "EXPRESS" | "VUE" | "HONO" | "ANGULAR"
+    description?: string
+  }) => {
+    const res = await createPlayground(data)
+    toast.success("Playground created")
+    setIsModalOpen(false)
+    router.push(`/playground/${res?.id}`)
+  }
 
   return (
     <Sidebar variant="inset" collapsible="icon" className="border-r">
       <SidebarHeader>
-        <div className="flex items-center gap-2 px-4 py-3 justify-center">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="logo" height={60} width={60} />
+        <div className="flex items-center justify-center px-2 py-2">
+          <img src="/logo.png" alt="logo" height={40} width={40} className="shrink-0" />
         </div>
       </SidebarHeader>
 
@@ -101,7 +116,9 @@ export function DashboardSidebar({
 
         <SidebarGroup>
           <SidebarGroupLabel><Star className="h-4 w-4 mr-2" />Starred</SidebarGroupLabel>
-          <SidebarGroupAction title="Add starred playground"><Plus className="h-4 w-4" /></SidebarGroupAction>
+          <SidebarGroupAction title="New playground" onClick={() => setIsModalOpen(true)}>
+            <Plus className="h-4 w-4" />
+          </SidebarGroupAction>
           <SidebarGroupContent>
             <SidebarMenu>
               {starredPlaygrounds.length === 0 && recentPlaygrounds.length === 0 ? (
@@ -124,7 +141,9 @@ export function DashboardSidebar({
 
         <SidebarGroup>
           <SidebarGroupLabel><History className="h-4 w-4 mr-2" />Recent</SidebarGroupLabel>
-          <SidebarGroupAction title="Create new playground"><FolderPlus className="h-4 w-4" /></SidebarGroupAction>
+          <SidebarGroupAction title="New playground" onClick={() => setIsModalOpen(true)}>
+            <FolderPlus className="h-4 w-4" />
+          </SidebarGroupAction>
           <SidebarGroupContent>
             <SidebarMenu>
               {recentPlaygrounds.map((playground) => {
@@ -213,6 +232,11 @@ export function DashboardSidebar({
       </SidebarFooter>
 
       <SidebarRail />
+      <TemplateSelectionModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSubmit={handleCreatePlayground}
+      />
     </Sidebar>
   )
 }
