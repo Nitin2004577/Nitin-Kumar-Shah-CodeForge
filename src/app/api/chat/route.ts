@@ -159,7 +159,17 @@ export async function POST(req: Request) {
       tokens: data.usage?.total_tokens ?? 0,
     });
   } catch (err: any) {
-    console.error("AI API Error:", err?.message ?? err);
-    return NextResponse.json({ error: err?.message ?? "Failed to connect to AI." }, { status: 500 });
+    const msg = err?.message ?? String(err);
+    console.error("AI API Error:", msg);
+
+    // "fetch failed" = network-level failure reaching Groq
+    if (msg.includes("fetch failed") || msg.includes("ECONNREFUSED") || msg.includes("ENOTFOUND")) {
+      return NextResponse.json(
+        { error: "Could not reach the AI provider. Check that GROQ_API_KEY is set in your environment variables." },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ error: msg ?? "Failed to connect to AI." }, { status: 500 });
   }
 }
