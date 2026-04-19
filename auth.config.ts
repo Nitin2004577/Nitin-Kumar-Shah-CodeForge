@@ -15,7 +15,7 @@ export default {
           access_type: "offline",
           response_type: "code",
           // 1. openid, profile, email are required for basic login
-          // 2. Add your specific Google API scopes after that separated by spaces
+          // 2. Add the specific Google API scopes after that separated by spaces
           // scope: "openid profile email https://www.googleapis.com/auth/drive.readonly" 
         },
       },
