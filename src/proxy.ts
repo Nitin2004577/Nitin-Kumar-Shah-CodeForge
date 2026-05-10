@@ -1,30 +1,25 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { getToken } from "next-auth/jwt";
+import NextAuth from "next-auth";
+import authConfig from "../auth.config";
 
-export async function proxy(req: NextRequest) {
+// Lightweight auth instance — no Prisma adapter, safe for Edge/middleware
+const { auth } = NextAuth(authConfig);
+
+export const proxy = auth(function middleware(req) {
   const { pathname } = req.nextUrl;
+  const isLoggedIn = !!req.auth?.user;
 
-  // Always pass through NextAuth API routes — never intercept these
+  // Always pass through NextAuth API routes
   if (pathname.startsWith("/api/auth")) {
     return NextResponse.next();
   }
 
-  // Always pass through API routes
+  // Always pass through other API routes
   if (pathname.startsWith("/api/")) {
     return NextResponse.next();
   }
 
-  const token = await getToken({
-    req,
-    secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
-    // NextAuth v5 uses "authjs.session-token" in production, "next-auth.session-token" in dev
-    cookieName: process.env.NODE_ENV === "production"
-      ? "__Secure-authjs.session-token"
-      : "authjs.session-token",
-  });
-
-  const isLoggedIn = !!token;
   const isAuthPage = pathname.startsWith("/auth");
   const isPublicPage = pathname === "/";
 
@@ -51,7 +46,7 @@ export async function proxy(req: NextRequest) {
   }
 
   return NextResponse.next();
-}
+});
 
 export const config = {
   matcher: [

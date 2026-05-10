@@ -51,7 +51,7 @@ next-env.d.ts
 jest.config.ts
 jest.setup.ts
 styleMock.ts
-__tests__/
+# __tests__/
 __mocks__/
 41
 
