@@ -10,6 +10,7 @@ import { PlaygroundWorkspace } from "./playground-workspace"
 
 export function PlaygroundLayout() {
   const { 
+    id,
     error, 
     loadingStep, 
     templateData, 
@@ -92,6 +93,7 @@ export function PlaygroundLayout() {
 
       <div className="flex-1 min-h-0 flex flex-col">
         <PlaygroundWorkspace
+          playgroundId={id}
           activeFile={explorer.openFiles?.find((f: any) => f.id === explorer.activeFileId)}
           isPreviewVisible={logic.isPreviewVisible}
           isChatOpen={isChatOpen}

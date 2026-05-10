@@ -10,6 +10,7 @@ import { useAISuggestions } from "@/../features/playground/hooks/useAISuggestion
 import { usePlaygroundLogic } from "@/../features/playground/hooks/usePlaygroundLogic";
 
 interface PlaygroundContextType {
+  id: string;
   playgroundData: any;
   templateData: any;
   loadingStep: number;
@@ -45,6 +46,7 @@ export function PlaygroundProvider({ children }: { children: ReactNode }) {
   }, [isLoading, templateData, error]);
 
   const value: PlaygroundContextType = {
+    id,
     playgroundData,
     templateData,
     loadingStep,

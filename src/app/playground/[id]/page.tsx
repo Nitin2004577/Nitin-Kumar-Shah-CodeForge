@@ -416,6 +416,7 @@ const MainPlaygroundPage: React.FC = () => {
               {/* Workspace */}
               <div className="flex-1 min-h-0 flex flex-col">
                 <PlaygroundWorkspace
+                  playgroundId={id}
                   activeFile={activeFile}
                   isPreviewVisible={logic.isPreviewVisible}
                   isChatOpen={false}
@@ -484,6 +485,7 @@ const MainPlaygroundPage: React.FC = () => {
               <div className="flex-1 min-h-0 overflow-hidden">
                 {mobileView === "editor" && (
                   <PlaygroundWorkspace
+                    playgroundId={id}
                     activeFile={activeFile}
                     isPreviewVisible={false}
                     isChatOpen={false}

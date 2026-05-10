@@ -11,24 +11,26 @@ import { findFilePath } from "../lib";
 import { TemplateFile, TemplateFolder } from "../types";
 
 // --- NEW HELPER FUNCTION ---
-// Helper to convert your DB structure (items array) to WebContainer structure
-const buildFileSystemTree = (folder: TemplateFolder): FileSystemTree => {
+// Helper to convert your DB structure (items array) to WebContainer structure.
+// playgroundId is used to scope localStorage keys so files from different
+// projects never bleed into each other.
+const buildFileSystemTree = (folder: TemplateFolder, playgroundId: string): FileSystemTree => {
   const tree: FileSystemTree = {};
 
   if (folder.items && Array.isArray(folder.items)) {
     folder.items.forEach((item) => {
       if ("folderName" in item) {
         tree[item.folderName] = {
-          directory: buildFileSystemTree(item as TemplateFolder),
+          directory: buildFileSystemTree(item as TemplateFolder, playgroundId),
         };
       } else if ("filename" in item) {
         const fileItem = item as TemplateFile;
         // Use the exact filename + extension
         const fullFileName = `${fileItem.filename}.${fileItem.fileExtension}`;
 
-        // Check if we have a saved version of THIS specific file
+        // Scope the key to this project so other projects' saved content is never loaded
         const savedContent = localStorage.getItem(
-          `file-storage-${fullFileName}`
+          `file-storage-${playgroundId}-${fullFileName}`
         );
 
         tree[fullFileName] = {
@@ -145,7 +147,8 @@ export const usePlaygroundLogic = (
         try {
           // Convert the custom TemplateFolder into a FileSystemTree
           const fileSystemTree = buildFileSystemTree(
-            templateData as TemplateFolder
+            templateData as TemplateFolder,
+            id
           );
 
           // Mount the correctly formatted tree
@@ -167,7 +170,7 @@ export const usePlaygroundLogic = (
   }, [id]);
 
   useEffect(() => {
-    if (templateData && !explorer.openFiles.length) {
+    if (templateData) {
       explorer.setTemplateData(templateData);
     }
     // Bug fix: setTemplateData is a stable Zustand action, safe to omit

@@ -14,6 +14,7 @@ import { TemplateFile } from "@/../features/playground/types";
 import { WebContainer } from "@webcontainer/api";
 
 interface PlaygroundWorkspaceProps {
+  playgroundId: string;
   activeFile?: TemplateFile | undefined;
   isPreviewVisible: boolean;
   isChatOpen?: boolean;
@@ -47,6 +48,7 @@ interface PlaygroundWorkspaceProps {
 }
 
 export const PlaygroundWorkspace: React.FC<PlaygroundWorkspaceProps> = ({
+  playgroundId,
   activeFile,
   isPreviewVisible,
   isChatOpen = false,
@@ -68,13 +70,13 @@ export const PlaygroundWorkspace: React.FC<PlaygroundWorkspaceProps> = ({
   useEffect(() => {
     if (activeFile && activeFile.id !== lastLoadedFileId.current) {
       const fullPath = `${activeFile.filename}.${activeFile.fileExtension}`;
-      const savedContent = localStorage.getItem(`file-storage-${fullPath}`);
+      const savedContent = localStorage.getItem(`file-storage-${playgroundId}-${fullPath}`);
       if (savedContent && savedContent !== activeFile.content) {
         onContentChange(savedContent);
       }
       lastLoadedFileId.current = activeFile.id;
     }
-  }, [activeFile?.id, activeFile?.filename, activeFile?.fileExtension, onContentChange]);
+  }, [activeFile?.id, activeFile?.filename, activeFile?.fileExtension, playgroundId, onContentChange]);
 
   // Debounced live write — pushes every edit to WebContainer after 300ms idle
   // This triggers Vite/webpack HMR without waiting for Ctrl+S
@@ -98,7 +100,7 @@ export const PlaygroundWorkspace: React.FC<PlaygroundWorkspaceProps> = ({
     try {
       const fullPath = `${activeFile.filename}.${activeFile.fileExtension}`;
       await preview.writeFileSync(fullPath, newContent);
-      localStorage.setItem(`file-storage-${fullPath}`, newContent);
+      localStorage.setItem(`file-storage-${playgroundId}-${fullPath}`, newContent);
     } catch (err) {
       console.error("❌ Save failed:", err);
     }

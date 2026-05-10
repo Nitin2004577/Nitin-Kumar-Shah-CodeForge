@@ -79,7 +79,20 @@ export const useFileExplorer = create<FileExplorerState>()(
 
       setTemplateData: (data) => set({ templateData: data }),
       setPlaygroundId(id) {
-        set({ playgroundId: id });
+        const currentId = get().playgroundId;
+        // When switching to a different project, wipe all per-project UI state
+        // so stale open files / active file from the old project never bleed in.
+        if (currentId && currentId !== id) {
+          set({
+            playgroundId: id,
+            openFiles: [],
+            activeFileId: null,
+            editorContent: "",
+            templateData: null,
+          });
+        } else {
+          set({ playgroundId: id });
+        }
       },
       setEditorContent: (content) => set({ editorContent: content }),
       setOpenFiles: (files) => set({ openFiles: files }),
